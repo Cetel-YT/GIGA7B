@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Онлайн шашки</title>
+    <title>Онлайн шашки W</title>
     
     <!-- Firebase SDK -->
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
@@ -153,6 +153,16 @@
             box-shadow: 0 5px 20px rgba(255, 204, 0, 0.4);
         }
         
+        .btn-rating {
+            background: linear-gradient(90deg, #9d50bb, #6e48aa);
+            color: white;
+        }
+        
+        .btn-rating:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(157, 80, 187, 0.4);
+        }
+        
         .btn-small {
             padding: 8px 16px;
             font-size: 0.9rem;
@@ -201,6 +211,12 @@
         .stat-label {
             font-size: 0.9rem;
             color: #aaa;
+        }
+        
+        .calibration-info {
+            font-size: 0.8rem;
+            color: #ffcc00;
+            margin-top: 5px;
         }
         
         #game {
@@ -457,7 +473,7 @@
         
         #gameModes {
             display: grid;
-            grid-template-columns: repeat(3, 1fr);
+            grid-template-columns: repeat(4, 1fr);
             gap: 10px;
             margin-bottom: 20px;
         }
@@ -477,6 +493,12 @@
             background: rgba(0, 255, 136, 0.2);
             border-color: #00ff88;
             color: #00ff88;
+        }
+        
+        .mode-btn.rating-active {
+            background: rgba(157, 80, 187, 0.2);
+            border-color: #9d50bb;
+            color: #9d50bb;
         }
         
         .mode-btn:hover {
@@ -712,7 +734,17 @@
             }
             
             #gameModes {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+        
+        @media (max-width: 480px) {
+            #gameModes {
                 grid-template-columns: 1fr;
+            }
+            
+            .stat-value {
+                font-size: 1.4rem;
             }
         }
     </style>
@@ -753,6 +785,7 @@
             <div>
                 <h2>👋 Привет, <span id="currentUserName"></span>! <span id="adminBadge" class="admin-badge" style="display: none;">АДМИН</span></h2>
                 <p>Рейтинг: <span id="currentUserRating" class="stat-value">1000</span></p>
+                <div id="calibrationInfo" class="calibration-info" style="display: none;"></div>
             </div>
             <div id="user-stats">
                 <div class="stat">
@@ -770,6 +803,7 @@
             </div>
             <div>
                 <button class="btn btn-secondary" onclick="logout()">🚪 Выйти</button>
+                <button class="btn btn-rating" onclick="resetRating()" style="margin-left: 10px;">🔄 Сбросить рейтинг</button>
                 <button id="adminPanelBtn" class="btn btn-admin" style="display: none; margin-left: 10px;" onclick="toggleAdminPanel()">⚙️ Админ-панель</button>
             </div>
         </div>
@@ -822,6 +856,7 @@
                             <div class="mode-btn active" onclick="setGameMode('normal')">🎯 Обычные</div>
                             <div class="mode-btn" onclick="setGameMode('giveaway')">🔄 Поддавки</div>
                             <div class="mode-btn" onclick="setGameMode('fog')">🌫️ Туман войны</div>
+                            <div class="mode-btn" onclick="setGameMode('rating')">🏆 Рейтинг</div>
                         </div>
                     </div>
                     
@@ -908,8 +943,8 @@
         let chatRef = null;
         let chatListener = null;
         
-        // Новые переменные для режимов
-        let gameMode = 'normal'; // 'normal', 'giveaway', 'fog'
+        // Режимы игры
+        let gameMode = 'normal'; // 'normal', 'giveaway', 'fog', 'rating'
         let fogOfWarActive = false;
         let revealedCells = new Set();
         
@@ -1011,9 +1046,13 @@
                     wins: 0,
                     losses: 0,
                     draws: 0,
+                    calibrationGames: 0,
+                    calibrationCompleted: false,
+                    ratingHistory: [],
                     isAdmin: isAdmin,
                     createdAt: firebase.database.ServerValue.TIMESTAMP,
                     lastOnline: firebase.database.ServerValue.TIMESTAMP,
+                    lastRatingReset: null,
                     status: 'online'
                 };
                 
@@ -1190,18 +1229,33 @@
             fogOfWarActive = (mode === 'fog');
             
             // Обновляем UI кнопок
-            document.querySelectorAll('.mode-btn').forEach(btn => btn.classList.remove('active'));
-            event.target.classList.add('active');
+            document.querySelectorAll('.mode-btn').forEach(btn => {
+                btn.classList.remove('active', 'rating-active');
+            });
+            
+            event.target.classList.add(mode === 'rating' ? 'rating-active' : 'active');
             
             // Обновляем отображение режима
             const modeNames = {
                 'normal': 'Обычные шашки',
                 'giveaway': 'Поддавки',
-                'fog': 'Туман войны'
+                'fog': 'Туман войны',
+                'rating': '🏆 Рейтинговая игра'
             };
             
             document.getElementById('game-mode-display').textContent = modeNames[mode];
             document.getElementById('fog-info').style.display = fogOfWarActive ? 'block' : 'none';
+            
+            // В рейтинговом режиме скрываем выбор сложности
+            if (mode === 'rating') {
+                document.getElementById('bot-controls').style.display = 'none';
+                document.getElementById('player2-rating').textContent = 'Уровень: 👑 Эксперт';
+                document.getElementById('botDifficulty').value = 'expert';
+                showNotification('🏆 Рейтинговая игра! Сложность: эксперт');
+            } else {
+                document.getElementById('bot-controls').style.display = 'block';
+                updateBotLevel();
+            }
             
             showNotification(`✅ Режим изменен: ${modeNames[mode]}`);
             
@@ -1246,16 +1300,10 @@
                     
                     const piece = boardState[row][col];
                     if (piece !== 0) {
-                        // В режиме тумана войны шашки бота создаем всегда, но они будут скрыты классом hidden
                         const checker = document.createElement('div');
                         checker.className = `checker player${piece === 1 || piece === 3 ? '1' : '2'}${piece > 2 ? ' king' : ''}`;
                         checker.dataset.row = row;
                         checker.dataset.col = col;
-                        
-                        // Если это шашка бота и клетка скрыта, добавляем дополнительный класс
-                        if (fogOfWarActive && row < 4 && (piece === 2 || piece === 4)) {
-                            checker.classList.add('hidden-checker');
-                        }
                         
                         cell.appendChild(checker);
                     }
@@ -1265,11 +1313,10 @@
             }
             
             // После создания доски обновляем раскрытые клетки
-            updateRevealedCells();
+            updateFogDisplay();
             updateGameStats();
         }
         
-        // ИСПРАВЛЕННАЯ ФУНКЦИЯ: Теперь шашки бота видны в раскрытых зонах
         function updateBoardUI() {
             const cells = document.querySelectorAll('.cell');
             cells.forEach(cell => {
@@ -1290,25 +1337,21 @@
                     checker.dataset.row = row;
                     checker.dataset.col = col;
                     
-                    // В режиме тумана войны для шашек бота проверяем, раскрыта ли клетка
+                    // В режиме тумана войны скрываем шашки бота на скрытых клетках
                     if (fogOfWarActive && row < 4 && (piece === 2 || piece === 4)) {
                         if (revealedCells.has(`${row},${col}`)) {
-                            // Клетка раскрыта - показываем шашку
                             cell.appendChild(checker);
                         }
-                        // Если клетка не раскрыта - не показываем шашку
                     } else {
-                        // Все остальные шашки показываем всегда
                         cell.appendChild(checker);
                     }
                 }
             });
             
             // Обновляем раскрытые клетки
-            updateRevealedCells();
+            updateFogDisplay();
         }
         
-        // ИСПРАВЛЕННАЯ ФУНКЦИЯ: Теперь правильно обновляет видимость клеток
         function updateRevealedCells() {
             if (!fogOfWarActive) return;
             
@@ -1318,7 +1361,7 @@
             for (let row = 0; row < 8; row++) {
                 for (let col = 0; col < 8; col++) {
                     if (boardState[row][col] === 1 || boardState[row][col] === 3) {
-                        // Раскрываем клетки вокруг шашки (в радиусе 2 для лучшего обзора)
+                        // Раскрываем клетки вокруг шашки игрока
                         for (let dr = -2; dr <= 2; dr++) {
                             for (let dc = -2; dc <= 2; dc++) {
                                 const newRow = row + dr;
@@ -1330,49 +1373,74 @@
                             }
                         }
                     }
+                    
+                    // Также раскрываем клетки вокруг шашек бота, если они рядом с шашками игрока
+                    if (boardState[row][col] === 2 || boardState[row][col] === 4) {
+                        // Проверяем, есть ли рядом шашки игрока
+                        let playerNearby = false;
+                        for (let dr = -2; dr <= 2; dr++) {
+                            for (let dc = -2; dc <= 2; dc++) {
+                                const checkRow = row + dr;
+                                const checkCol = col + dc;
+                                
+                                if (isValidPosition(checkRow, checkCol)) {
+                                    if (boardState[checkRow][checkCol] === 1 || 
+                                        boardState[checkRow][checkCol] === 3) {
+                                        playerNearby = true;
+                                        break;
+                                    }
+                                }
+                            }
+                            if (playerNearby) break;
+                        }
+                        
+                        // Если шашка игрока рядом, раскрываем эту клетку
+                        if (playerNearby) {
+                            newRevealedCells.add(`${row},${col}`);
+                            // Раскрываем вокруг вражеской шашки
+                            for (let dr = -1; dr <= 1; dr++) {
+                                for (let dc = -1; dc <= 1; dc++) {
+                                    const nearRow = row + dr;
+                                    const nearCol = col + dc;
+                                    
+                                    if (isValidPosition(nearRow, nearCol) && nearRow < 4) {
+                                        newRevealedCells.add(`${nearRow},${nearCol}`);
+                                    }
+                                }
+                            }
+                        }
+                    }
                 }
             }
             
             revealedCells = newRevealedCells;
+            updateFogDisplay();
+        }
+        
+        function updateFogDisplay() {
+            if (!fogOfWarActive) return;
             
-            // Обновляем отображение клеток
-            const cells = document.querySelectorAll('.cell[data-hidden="true"]');
+            const cells = document.querySelectorAll('.cell');
             cells.forEach(cell => {
                 const row = parseInt(cell.dataset.row);
                 const col = parseInt(cell.dataset.col);
                 
-                if (revealedCells.has(`${row},${col}`)) {
-                    // Клетка раскрыта - показываем ее
-                    cell.classList.remove('hidden');
-                    cell.classList.add('revealed');
-                    cell.classList.add((row + col) % 2 === 0 ? 'light' : 'dark');
-                    cell.dataset.hidden = 'false';
-                    
-                    // Также показываем шашку бота, если она есть в этой клетке
-                    const piece = boardState[row][col];
-                    if (piece === 2 || piece === 4) {
-                        // Удаляем старую шашку если есть
-                        const oldChecker = cell.querySelector('.checker');
-                        if (oldChecker) oldChecker.remove();
-                        
-                        // Создаем новую шашку
-                        const checker = document.createElement('div');
-                        checker.className = `checker player${piece === 1 || piece === 3 ? '1' : '2'}${piece > 2 ? ' king' : ''}`;
-                        checker.dataset.row = row;
-                        checker.dataset.col = col;
-                        cell.appendChild(checker);
+                if (row < 4) {
+                    if (revealedCells.has(`${row},${col}`)) {
+                        cell.classList.remove('hidden');
+                        cell.classList.add('revealed');
+                        cell.classList.add((row + col) % 2 === 0 ? 'light' : 'dark');
+                        cell.dataset.hidden = 'false';
+                    } else {
+                        cell.classList.add('hidden');
+                        cell.classList.remove('revealed', 'light', 'dark');
+                        cell.dataset.hidden = 'true';
                     }
-                } else {
-                    // Клетка скрыта
-                    cell.classList.add('hidden');
-                    cell.classList.remove('revealed', 'light', 'dark');
-                    cell.dataset.hidden = 'true';
-                    
-                    // Скрываем шашку бота если она есть
-                    const oldChecker = cell.querySelector('.checker');
-                    if (oldChecker) oldChecker.remove();
                 }
             });
+            
+            // Обновляем отображение шашек
+            updateBoardUI();
         }
         
         function getInitialBoard() {
@@ -2258,39 +2326,58 @@
             gameActive = false;
             
             let message = '';
+            let gameResult = '';
             
             if (gameMode === 'giveaway') {
                 if (winner === 1) {
-                    message = '🎉 Вы проиграли! (Победа в поддавках)';
-                    document.getElementById('game-status').textContent = message;
-                    showNotification('🎉 Вы успешно отдали все шашки! Победа в поддавках!');
-                    if (currentUser) {
-                        updateUserStats('win');
-                    }
+                    message = '🎉 Вы проиграли все шашки! Победа в поддавках!';
+                    gameResult = 'win';
                 } else {
-                    message = '😞 Бот проиграл (Вы победили в поддавках)';
-                    document.getElementById('game-status').textContent = message;
-                    showNotification('😞 Бот отдал все шашки! Вы проиграли в поддавках.');
-                    if (currentUser) {
-                        updateUserStats('loss');
-                    }
+                    message = '😞 Бот отдал все шашки! Вы проиграли в поддавках.';
+                    gameResult = 'loss';
                 }
             } else {
                 if (winner === 1) {
                     message = '🎉 Вы победили!';
-                    document.getElementById('game-status').textContent = message;
-                    showNotification('🎉 Поздравляем! Вы выиграли!');
-                    if (currentUser) {
-                        updateUserStats('win');
-                    }
+                    gameResult = 'win';
                 } else {
                     message = '😞 Бот победил';
-                    document.getElementById('game-status').textContent = message;
-                    showNotification('😞 Бот выиграл. Попробуйте еще раз!');
-                    if (currentUser) {
-                        updateUserStats('loss');
-                    }
+                    gameResult = 'loss';
                 }
+            }
+            
+            document.getElementById('game-status').textContent = message;
+            
+            // Обновляем статистику пользователя
+            if (currentUser && gameMode !== 'rating') {
+                updateUserStats(gameResult);
+            }
+            
+            // Обновляем рейтинг в рейтинговом режиме
+            if (currentUser && gameMode === 'rating') {
+                updateRating(gameResult);
+            }
+            
+            // Подсчитываем оставшиеся шашки для отображения
+            countPiecesForRating(winner);
+            
+            showNotification(message);
+        }
+        
+        function countPiecesForRating(winner) {
+            let player1Pieces = 0;
+            let player2Pieces = 0;
+            
+            for (let row = 0; row < 8; row++) {
+                for (let col = 0; col < 8; col++) {
+                    const piece = boardState[row][col];
+                    if (piece === 1 || piece === 3) player1Pieces++;
+                    if (piece === 2 || piece === 4) player2Pieces++;
+                }
+            }
+            
+            if (gameMode === 'rating') {
+                console.log(`Рейтинговая игра завершена. Осталось шашек: игрок - ${player1Pieces}, бот - ${player2Pieces}`);
             }
         }
         
@@ -2355,6 +2442,11 @@
         function startNewGame() {
             console.log('🆕 Начало новой игры');
             
+            // Обновляем раскрытые клетки перед началом новой игры
+            if (fogOfWarActive) {
+                updateRevealedCells();
+            }
+            
             initBoard();
             currentPlayer = 1;
             gameActive = true;
@@ -2402,6 +2494,12 @@
                 - Половина доски соперника скрыта туманом
                 - Шашки соперника видны только в радиусе 2 клеток от ваших шашек
                 - Когда вы приближаетесь к шашке противника, она становится видимой
+                
+                Рейтинговая система:
+                - Первые 3 игры - калибровочные
+                - После калибровки рейтинг от 1000 до 4000
+                - Можно сбросить рейтинг раз в месяц
+                - В рейтинговом режиме всегда игра против эксперта
                 
                 Удачи в игре! 🎮
             `;
@@ -2501,31 +2599,180 @@
         }
         
         // ====================================================
+        // РЕЙТИНГОВАЯ СИСТЕМА
+        // ====================================================
+        async function updateRating(gameResult) {
+            if (!currentUser) return;
+            
+            try {
+                const userRef = database.ref('users/' + currentUser.uid);
+                const snapshot = await userRef.once('value');
+                const userData = snapshot.val() || {};
+                
+                let userRating = userData.rating || 1000;
+                let userCalibrationGames = userData.calibrationGames || 0;
+                let userCalibrationCompleted = userData.calibrationCompleted || false;
+                let userRatingHistory = userData.ratingHistory || [];
+                let userLastRatingReset = userData.lastRatingReset || null;
+                
+                let result = 0;
+                if (gameResult === 'win') result = 1;
+                else if (gameResult === 'draw') result = 0.5;
+                
+                let newRating;
+                let ratingChange;
+                
+                if (!userCalibrationCompleted && userCalibrationGames < 3) {
+                    userCalibrationGames++;
+                    
+                    if (result === 1) {
+                        ratingChange = 1000;
+                    } else if (result === 0.5) {
+                        ratingChange = 500;
+                    } else {
+                        ratingChange = 0;
+                    }
+                    
+                    newRating = userRating + ratingChange;
+                    
+                    if (userCalibrationGames >= 3) {
+                        userCalibrationCompleted = true;
+                        
+                        if (newRating < 1000) newRating = 1000;
+                        if (newRating > 4000) newRating = 4000;
+                        
+                        showNotification(`🎯 Калибровка завершена! Ваш рейтинг: ${Math.round(newRating)}`);
+                    }
+                } else {
+                    const expectedScore = 1 / (1 + Math.pow(10, (2000 - userRating) / 400));
+                    const kFactor = calculateKFactor(userRating);
+                    
+                    ratingChange = Math.round(kFactor * (result - expectedScore));
+                    newRating = userRating + ratingChange;
+                    
+                    if (newRating < 1000) newRating = 1000;
+                    if (newRating > 4000) newRating = 4000;
+                }
+                
+                userRatingHistory.push({
+                    rating: Math.round(newRating),
+                    change: ratingChange,
+                    timestamp: firebase.database.ServerValue.TIMESTAMP,
+                    result: gameResult,
+                    mode: gameMode
+                });
+                
+                if (userRatingHistory.length > 100) {
+                    userRatingHistory = userRatingHistory.slice(-100);
+                }
+                
+                await userRef.update({
+                    rating: Math.round(newRating),
+                    calibrationGames: userCalibrationGames,
+                    calibrationCompleted: userCalibrationCompleted,
+                    ratingHistory: userRatingHistory,
+                    lastRatingReset: userLastRatingReset
+                });
+                
+                document.getElementById('currentUserRating').textContent = Math.round(newRating);
+                
+                updateCalibrationInfo();
+                
+                if (ratingChange > 0) {
+                    showNotification(`📈 Рейтинг +${ratingChange} = ${Math.round(newRating)}`);
+                } else if (ratingChange < 0) {
+                    showNotification(`📉 Рейтинг ${ratingChange} = ${Math.round(newRating)}`);
+                } else {
+                    showNotification(`📊 Рейтинг не изменился: ${Math.round(newRating)}`);
+                }
+                
+                updateUserStats(gameResult, true);
+                
+            } catch (error) {
+                console.error('❌ Ошибка обновления рейтинга:', error);
+            }
+        }
+        
+        function calculateKFactor(currentRating) {
+            if (currentRating < 1500) return 32;
+            if (currentRating < 2000) return 24;
+            if (currentRating < 2500) return 16;
+            return 8;
+        }
+        
+        async function resetRating() {
+            if (!currentUser) return;
+            
+            try {
+                const userRef = database.ref('users/' + currentUser.uid);
+                const snapshot = await userRef.once('value');
+                const userData = snapshot.val() || {};
+                
+                const now = new Date();
+                const oneMonthAgo = new Date(now.getFullYear(), now.getMonth() - 1, now.getDate());
+                
+                if (userData.lastRatingReset && new Date(userData.lastRatingReset) > oneMonthAgo) {
+                    const daysLeft = Math.ceil((new Date(userData.lastRatingReset) - oneMonthAgo) / (1000 * 60 * 60 * 24));
+                    showNotification(`⏳ Сброс рейтинга будет доступен через ${daysLeft} дней`, 'warning');
+                    return;
+                }
+                
+                if (confirm('Вы уверены, что хотите сбросить рейтинг? Все калибровочные игры будут сброшены, рейтинг установлен в 1000.')) {
+                    await userRef.update({
+                        rating: 1000,
+                        calibrationGames: 0,
+                        calibrationCompleted: false,
+                        lastRatingReset: firebase.database.ServerValue.TIMESTAMP
+                    });
+                    
+                    document.getElementById('currentUserRating').textContent = '1000';
+                    updateCalibrationInfo();
+                    showNotification('✅ Рейтинг сброшен до 1000');
+                }
+            } catch (error) {
+                console.error('❌ Ошибка сброса рейтинга:', error);
+                showNotification('❌ Ошибка сброса рейтинга', 'error');
+            }
+        }
+        
+        function updateCalibrationInfo() {
+            if (!currentUser) return;
+            
+            const calibrationInfo = document.getElementById('calibrationInfo');
+            if (!calibrationInfo) return;
+            
+            if (!currentUser.calibrationCompleted && currentUser.calibrationGames < 3) {
+                calibrationInfo.textContent = `Калибровка: ${currentUser.calibrationGames || 0}/3 игр`;
+                calibrationInfo.style.display = 'block';
+            } else if (!currentUser.calibrationCompleted) {
+                calibrationInfo.textContent = 'Калибровка завершена';
+                calibrationInfo.style.display = 'block';
+            } else {
+                calibrationInfo.style.display = 'none';
+            }
+        }
+        
+        // ====================================================
         // ИНТЕРФЕЙС ПОЛЬЗОВАТЕЛЯ
         // ====================================================
         function showAuthScreen() {
-            // Останавливаем игру
             gameActive = false;
             botThinking = false;
             
-            // Отписываемся от чата
             if (chatListener) {
                 chatRef.off('value', chatListener);
                 chatListener = null;
             }
             
-            // Скрываем все игровые элементы
             document.getElementById('auth').style.display = 'block';
             document.getElementById('user-info-panel').style.display = 'none';
             document.getElementById('game').style.display = 'none';
             document.getElementById('admin-panel').style.display = 'none';
             
-            // Очищаем поля ввода
             document.getElementById('login').value = '';
             document.getElementById('password').value = '';
             document.getElementById('authMessage').textContent = '';
             
-            // Сбрасываем состояние чата
             document.getElementById('chat-messages').innerHTML = '';
         }
         
@@ -2542,7 +2789,6 @@
                 document.getElementById('adminBadge').style.display = 'inline-block';
             }
             
-            // Подписка на чат с правильной обработкой
             chatRef = database.ref('chat').limitToLast(50);
             chatListener = (snapshot) => {
                 const messages = snapshot.val();
@@ -2560,28 +2806,48 @@
             document.getElementById('userLosses').textContent = currentUser.losses || 0;
             document.getElementById('userDraws').textContent = currentUser.draws || 0;
             
+            updateCalibrationInfo();
+            
             document.getElementById('player1-name').textContent = currentUser.username;
         }
         
-        async function updateUserStats(result) {
+        async function updateUserStats(result, skipRatingUpdate = false) {
             if (!currentUser) return;
             
             try {
+                const userRef = database.ref('users/' + currentUser.uid);
+                const snapshot = await userRef.once('value');
+                const userData = snapshot.val() || {};
+                
                 const updates = {};
+                
                 if (result === 'win') {
-                    updates.wins = (currentUser.wins || 0) + 1;
-                    updates.rating = (currentUser.rating || 1000) + 10;
+                    updates.wins = (userData.wins || 0) + 1;
                 } else if (result === 'loss') {
-                    updates.losses = (currentUser.losses || 0) + 1;
-                    updates.rating = Math.max(100, (currentUser.rating || 1000) - 10);
+                    updates.losses = (userData.losses || 0) + 1;
                 } else {
-                    updates.draws = (currentUser.draws || 0) + 1;
+                    updates.draws = (userData.draws || 0) + 1;
                 }
                 
-                await database.ref('users/' + currentUser.uid).update(updates);
+                if (gameMode !== 'rating' && !skipRatingUpdate) {
+                    if (result === 'win') {
+                        updates.rating = Math.min(4000, (userData.rating || 1000) + 10);
+                    } else if (result === 'loss') {
+                        updates.rating = Math.max(100, (userData.rating || 1000) - 10);
+                    }
+                }
+                
+                await userRef.update(updates);
                 
                 Object.assign(currentUser, updates);
-                updateUserUI();
+                
+                document.getElementById('userWins').textContent = currentUser.wins || 0;
+                document.getElementById('userLosses').textContent = currentUser.losses || 0;
+                document.getElementById('userDraws').textContent = currentUser.draws || 0;
+                
+                if (gameMode !== 'rating') {
+                    document.getElementById('currentUserRating').textContent = currentUser.rating || 1000;
+                }
                 
             } catch (error) {
                 console.error('❌ Ошибка обновления статистики:', error);
