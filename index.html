@@ -1,0 +1,1861 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Онлайн шашки</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', Arial, sans-serif;
+        }
+        
+        body {
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            color: #f1f1f1;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        
+        header {
+            text-align: center;
+            padding: 20px 0;
+            margin-bottom: 30px;
+            border-bottom: 2px solid #0fcc45;
+        }
+        
+        h1 {
+            font-size: 2.8rem;
+            background: linear-gradient(90deg, #0fcc45, #00d4ff);
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+            margin-bottom: 10px;
+        }
+        
+        .subtitle {
+            color: #aaa;
+            font-size: 1.2rem;
+        }
+        
+        /* Панель аутентификации */
+        #auth {
+            background: rgba(30, 30, 46, 0.9);
+            border-radius: 15px;
+            padding: 30px;
+            max-width: 500px;
+            margin: 40px auto;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+            border: 1px solid #333;
+        }
+        
+        #auth h2 {
+            text-align: center;
+            margin-bottom: 25px;
+            color: #0fcc45;
+        }
+        
+        .input-group {
+            margin-bottom: 20px;
+        }
+        
+        .input-group label {
+            display: block;
+            margin-bottom: 8px;
+            color: #ddd;
+        }
+        
+        .input-group input {
+            width: 100%;
+            padding: 12px 15px;
+            border-radius: 8px;
+            border: 1px solid #444;
+            background: rgba(20, 20, 35, 0.8);
+            color: #fff;
+            font-size: 1rem;
+        }
+        
+        .input-group input:focus {
+            outline: none;
+            border-color: #0fcc45;
+            box-shadow: 0 0 0 2px rgba(15, 204, 69, 0.3);
+        }
+        
+        .btn {
+            padding: 12px 25px;
+            border-radius: 8px;
+            border: none;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        
+        .btn-primary {
+            background: linear-gradient(90deg, #0fcc45, #00b894);
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 5px 15px rgba(15, 204, 69, 0.4);
+        }
+        
+        .btn-secondary {
+            background: transparent;
+            color: #0fcc45;
+            border: 2px solid #0fcc45;
+        }
+        
+        .btn-secondary:hover {
+            background: rgba(15, 204, 69, 0.1);
+        }
+        
+        .btn-group {
+            display: flex;
+            gap: 15px;
+            margin-top: 10px;
+        }
+        
+        #authMessage {
+            margin-top: 15px;
+            text-align: center;
+            min-height: 25px;
+            color: #ff6b6b;
+        }
+        
+        /* Основной интерфейс игры */
+        #game {
+            display: none;
+            grid-template-columns: 1fr 350px;
+            gap: 30px;
+            margin-top: 20px;
+        }
+        
+        /* Игровая доска */
+        #game-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding: 15px;
+            background: rgba(30, 30, 46, 0.8);
+            border-radius: 10px;
+        }
+        
+        #player-info {
+            display: flex;
+            gap: 20px;
+        }
+        
+        .player-card {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px 15px;
+            background: rgba(20, 20, 35, 0.8);
+            border-radius: 8px;
+            min-width: 180px;
+        }
+        
+        .player-card.active {
+            border: 2px solid #0fcc45;
+        }
+        
+        .player-color {
+            width: 25px;
+            height: 25px;
+            border-radius: 50%;
+        }
+        
+        .player1-color {
+            background: #e74c3c;
+        }
+        
+        .player2-color {
+            background: #3498db;
+        }
+        
+        #game-status {
+            font-size: 1.3rem;
+            font-weight: bold;
+            color: #f1c40f;
+        }
+        
+        #board-container {
+            background: rgba(30, 30, 46, 0.8);
+            padding: 20px;
+            border-radius: 15px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+        }
+        
+        #board {
+            display: grid;
+            grid-template-columns: repeat(8, 70px);
+            grid-template-rows: repeat(8, 70px);
+            margin: 0 auto;
+            border: 3px solid #444;
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.7);
+        }
+        
+        .cell {
+            width: 70px;
+            height: 70px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            position: relative;
+        }
+        
+        .cell.light {
+            background-color: #f0d9b5;
+        }
+        
+        .cell.dark {
+            background-color: #b58863;
+        }
+        
+        .cell.selected {
+            box-shadow: inset 0 0 0 4px #0fcc45;
+        }
+        
+        .cell.available {
+            box-shadow: inset 0 0 0 3px rgba(241, 196, 15, 0.8);
+        }
+        
+        .cell.available::after {
+            content: '';
+            position: absolute;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: rgba(241, 196, 15, 0.6);
+        }
+        
+        .checker {
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            cursor: pointer;
+            position: relative;
+            z-index: 10;
+            transition: all 0.2s ease;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+        }
+        
+        .checker:hover {
+            transform: scale(1.05);
+        }
+        
+        .checker.player1 {
+            background: radial-gradient(circle at 30% 30%, #e74c3c, #c0392b);
+        }
+        
+        .checker.player2 {
+            background: radial-gradient(circle at 30% 30%, #3498db, #2980b9);
+        }
+        
+        .checker.king {
+            box-shadow: 0 0 0 4px #f1c40f, 0 4px 8px rgba(0, 0, 0, 0.3);
+        }
+        
+        .checker.king::after {
+            content: '♔';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: #f1c40f;
+            font-size: 24px;
+            font-weight: bold;
+            text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.8);
+        }
+        
+        /* Боковая панель */
+        #sidebar {
+            display: flex;
+            flex-direction: column;
+            gap: 25px;
+        }
+        
+        .panel {
+            background: rgba(30, 30, 46, 0.9);
+            border-radius: 15px;
+            padding: 20px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.4);
+            border: 1px solid #333;
+        }
+        
+        .panel h3 {
+            margin-bottom: 15px;
+            color: #0fcc45;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #444;
+        }
+        
+        /* Чат */
+        #chat-messages {
+            height: 300px;
+            overflow-y: auto;
+            margin-bottom: 15px;
+            padding: 10px;
+            background: rgba(20, 20, 35, 0.6);
+            border-radius: 8px;
+        }
+        
+        .message {
+            margin-bottom: 12px;
+            padding: 8px 12px;
+            background: rgba(40, 40, 60, 0.7);
+            border-radius: 8px;
+            border-left: 3px solid #0fcc45;
+        }
+        
+        .message .sender {
+            font-weight: bold;
+            color: #0fcc45;
+            margin-right: 8px;
+        }
+        
+        .message .time {
+            font-size: 0.8rem;
+            color: #888;
+            float: right;
+        }
+        
+        #message-input {
+            display: flex;
+            gap: 10px;
+        }
+        
+        #message-input input {
+            flex-grow: 1;
+            padding: 12px;
+            border-radius: 8px;
+            border: 1px solid #444;
+            background: rgba(20, 20, 35, 0.8);
+            color: #fff;
+        }
+        
+        /* Список пользователей */
+        #users-list {
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        
+        .user-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 15px;
+            margin-bottom: 10px;
+            background: rgba(40, 40, 60, 0.7);
+            border-radius: 8px;
+            border-left: 4px solid transparent;
+        }
+        
+        .user-item.current-user {
+            border-left-color: #0fcc45;
+        }
+        
+        .user-item.online {
+            border-left-color: #2ecc71;
+        }
+        
+        .user-info {
+            flex-grow: 1;
+        }
+        
+        .user-name {
+            font-weight: bold;
+            color: #ddd;
+        }
+        
+        .user-rating {
+            font-size: 0.9rem;
+            color: #f1c40f;
+        }
+        
+        .invite-btn {
+            padding: 6px 12px;
+            font-size: 0.9rem;
+            background: transparent;
+            color: #0fcc45;
+            border: 1px solid #0fcc45;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        
+        .invite-btn:hover {
+            background: rgba(15, 204, 69, 0.1);
+        }
+        
+        /* Панель управления игрой */
+        #game-controls {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+        
+        .controls-group {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        
+        select {
+            padding: 12px;
+            border-radius: 8px;
+            border: 1px solid #444;
+            background: rgba(20, 20, 35, 0.8);
+            color: #fff;
+            font-size: 1rem;
+        }
+        
+        #gameModes {
+            display: flex;
+            gap: 10px;
+        }
+        
+        .mode-btn {
+            flex-grow: 1;
+            padding: 12px;
+            text-align: center;
+            background: rgba(40, 40, 60, 0.7);
+            border-radius: 8px;
+            border: 1px solid #444;
+            color: #ddd;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        
+        .mode-btn.active {
+            background: rgba(15, 204, 69, 0.2);
+            border-color: #0fcc45;
+            color: #0fcc45;
+        }
+        
+        .mode-btn:hover {
+            background: rgba(15, 204, 69, 0.1);
+            border-color: #0fcc45;
+        }
+        
+        /* Информация о пользователе */
+        #user-info-panel {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px;
+            background: rgba(30, 30, 46, 0.9);
+            border-radius: 10px;
+            margin-bottom: 20px;
+        }
+        
+        #user-stats {
+            display: flex;
+            gap: 20px;
+        }
+        
+        .stat {
+            text-align: center;
+        }
+        
+        .stat-value {
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: #0fcc45;
+        }
+        
+        .stat-label {
+            font-size: 0.9rem;
+            color: #aaa;
+        }
+        
+        /* Адаптивность */
+        @media (max-width: 1200px) {
+            #game {
+                grid-template-columns: 1fr;
+            }
+            
+            #board {
+                grid-template-columns: repeat(8, 60px);
+                grid-template-rows: repeat(8, 60px);
+            }
+            
+            .cell, .checker {
+                width: 60px;
+                height: 60px;
+            }
+        }
+        
+        @media (max-width: 768px) {
+            #board {
+                grid-template-columns: repeat(8, 50px);
+                grid-template-rows: repeat(8, 50px);
+            }
+            
+            .cell, .checker {
+                width: 50px;
+                height: 50px;
+            }
+            
+            .btn-group {
+                flex-direction: column;
+            }
+            
+            #game-header {
+                flex-direction: column;
+                gap: 15px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Онлайн шашки</h1>
+            <p class="subtitle">Играйте с друзьями или с ботом. Повышайте свой рейтинг!</p>
+        </header>
+        
+        <!-- Панель аутентификации -->
+        <div id="auth">
+            <h2>Вход / Регистрация</h2>
+            <div class="input-group">
+                <label for="login">Имя пользователя</label>
+                <input type="text" id="login" placeholder="Введите имя пользователя">
+            </div>
+            <div class="input-group">
+                <label for="password">Пароль</label>
+                <input type="password" id="password" placeholder="Введите пароль">
+            </div>
+            <div class="btn-group">
+                <button class="btn btn-primary" onclick="register()">Регистрация</button>
+                <button class="btn btn-secondary" onclick="login()">Вход</button>
+            </div>
+            <div id="authMessage"></div>
+        </div>
+        
+        <!-- Основной интерфейс игры (скрыт до входа) -->
+        <div id="user-info-panel" style="display: none;">
+            <div>
+                <h2>Привет, <span id="currentUserName"></span>!</h2>
+                <p>Рейтинг: <span id="currentUserRating" class="stat-value">0</span></p>
+            </div>
+            <div id="user-stats">
+                <div class="stat">
+                    <div class="stat-value" id="userWins">0</div>
+                    <div class="stat-label">Победы</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-value" id="userLosses">0</div>
+                    <div class="stat-label">Поражения</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-value" id="userDraws">0</div>
+                    <div class="stat-label">Ничьи</div>
+                </div>
+            </div>
+            <button class="btn btn-secondary" onclick="logout()">Выйти</button>
+        </div>
+        
+        <div id="game">
+            <!-- Левая часть: игровое поле и управление -->
+            <div>
+                <div id="game-header">
+                    <div id="player-info">
+                        <div class="player-card" id="player1-card">
+                            <div class="player-color player1-color"></div>
+                            <div>
+                                <div id="player1-name">Игрок 1</div>
+                                <div id="player1-rating">Рейтинг: 0</div>
+                            </div>
+                        </div>
+                        <div class="player-card" id="player2-card">
+                            <div class="player-color player2-color"></div>
+                            <div>
+                                <div id="player2-name">Игрок 2</div>
+                                <div id="player2-rating">Рейтинг: 0</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div id="game-status">Ожидание начала игры</div>
+                </div>
+                
+                <div id="board-container">
+                    <div id="board"></div>
+                </div>
+                
+                <div id="game-controls" class="panel">
+                    <h3>Управление игрой</h3>
+                    <div class="controls-group">
+                        <label>Режим игры:</label>
+                        <div id="gameModes">
+                            <div class="mode-btn active" onclick="setGameMode('bot')">Против бота</div>
+                            <div class="mode-btn" onclick="setGameMode('online')">Онлайн</div>
+                            <div class="mode-btn" onclick="setGameMode('local')">Локально</div>
+                        </div>
+                    </div>
+                    
+                    <div class="controls-group" id="bot-controls">
+                        <label>Уровень сложности бота:</label>
+                        <select id="botDifficulty">
+                            <option value="easy">Легкий</option>
+                            <option value="medium" selected>Средний</option>
+                            <option value="hard">Сложный</option>
+                        </select>
+                    </div>
+                    
+                    <div class="controls-group">
+                        <button class="btn btn-primary" onclick="startNewGame()">Новая игра</button>
+                        <button class="btn btn-secondary" onclick="surrender()">Сдаться</button>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Правая часть: чат и список пользователей -->
+            <div id="sidebar">
+                <div class="panel">
+                    <h3>Чат</h3>
+                    <div id="chat-messages"></div>
+                    <div id="message-input">
+                        <input type="text" id="message" placeholder="Введите сообщение..." onkeypress="if(event.keyCode==13) sendMessage()">
+                        <button class="btn btn-primary" onclick="sendMessage()">Отправить</button>
+                    </div>
+                </div>
+                
+                <div class="panel">
+                    <h3>Онлайн пользователи</h3>
+                    <div id="users-list"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Глобальные переменные
+        let currentUser = null;
+        let gameMode = 'bot'; // 'bot', 'online', 'local'
+        let currentGame = null;
+        let selectedChecker = null;
+        let availableMoves = [];
+        let boardState = [];
+        let currentPlayer = 1; // 1 или 2
+        let gameActive = false;
+        let onlineUsers = [];
+        let chatMessages = [];
+        let botThinking = false;
+        
+        // Инициализация при загрузке страницы
+        document.addEventListener('DOMContentLoaded', function() {
+            checkAuthStatus();
+            initBoard();
+            loadChatMessages();
+            setInterval(updateOnlineStatus, 3000); // Эмуляция WebSocket для онлайн-статуса
+            setInterval(checkGameInvites, 2000); // Эмуляция WebSocket для проверки приглашений
+        });
+        
+        // ==================== АУТЕНТИФИКАЦИЯ ====================
+        
+        // Простая хэш-функция для паролей (только для демо)
+        function hashPassword(password) {
+            let hash = 0;
+            for (let i = 0; i < password.length; i++) {
+                const char = password.charCodeAt(i);
+                hash = ((hash << 5) - hash) + char;
+                hash = hash & hash; // Преобразование в 32-битное целое число
+            }
+            return hash.toString();
+        }
+        
+        // Регистрация нового пользователя
+        function register() {
+            const username = document.getElementById('login').value.trim();
+            const password = document.getElementById('password').value.trim();
+            
+            if (!username || !password) {
+                showAuthMessage('Пожалуйста, заполните все поля');
+                return;
+            }
+            
+            if (username.length < 3) {
+                showAuthMessage('Имя пользователя должно быть не менее 3 символов');
+                return;
+            }
+            
+            if (password.length < 4) {
+                showAuthMessage('Пароль должен быть не менее 4 символов');
+                return;
+            }
+            
+            // Получение пользователей из LocalStorage
+            const users = JSON.parse(localStorage.getItem('users')) || [];
+            
+            // Проверка, существует ли пользователь
+            if (users.find(u => u.username === username)) {
+                showAuthMessage('Пользователь с таким именем уже существует');
+                return;
+            }
+            
+            // Создание нового пользователя
+            const newUser = {
+                id: Date.now(),
+                username: username,
+                passwordHash: hashPassword(password),
+                rating: 1000,
+                wins: 0,
+                losses: 0,
+                draws: 0,
+                lastOnline: Date.now()
+            };
+            
+            users.push(newUser);
+            localStorage.setItem('users', JSON.stringify(users));
+            
+            // Автоматический вход после регистрации
+            loginUser(newUser);
+        }
+        
+        // Вход пользователя
+        function login() {
+            const username = document.getElementById('login').value.trim();
+            const password = document.getElementById('password').value.trim();
+            
+            if (!username || !password) {
+                showAuthMessage('Пожалуйста, заполните все поля');
+                return;
+            }
+            
+            // Получение пользователей из LocalStorage
+            const users = JSON.parse(localStorage.getItem('users')) || [];
+            const passwordHash = hashPassword(password);
+            
+            // Поиск пользователя
+            const user = users.find(u => u.username === username && u.passwordHash === passwordHash);
+            
+            if (user) {
+                loginUser(user);
+            } else {
+                showAuthMessage('Неверное имя пользователя или пароль');
+            }
+        }
+        
+        // Вход пользователя и обновление интерфейса
+        function loginUser(user) {
+            currentUser = user;
+            currentUser.lastOnline = Date.now();
+            
+            // Обновление пользователя в хранилище
+            const users = JSON.parse(localStorage.getItem('users')) || [];
+            const index = users.findIndex(u => u.id === user.id);
+            if (index !== -1) {
+                users[index] = currentUser;
+                localStorage.setItem('users', JSON.stringify(users));
+            }
+            
+            // Сохранение текущего пользователя в LocalStorage
+            localStorage.setItem('currentUser', JSON.stringify(currentUser));
+            
+            // Обновление интерфейса
+            document.getElementById('auth').style.display = 'none';
+            document.getElementById('user-info-panel').style.display = 'flex';
+            document.getElementById('game').style.display = 'grid';
+            
+            document.getElementById('currentUserName').textContent = currentUser.username;
+            document.getElementById('currentUserRating').textContent = currentUser.rating;
+            document.getElementById('userWins').textContent = currentUser.wins;
+            document.getElementById('userLosses').textContent = currentUser.losses;
+            document.getElementById('userDraws').textContent = currentUser.draws;
+            
+            // Обновление списка пользователей
+            updateUsersList();
+            
+            // Загрузка чата
+            loadChatMessages();
+            
+            // Начало новой игры по умолчанию
+            setTimeout(() => startNewGame(), 500);
+        }
+        
+        // Проверка статуса аутентификации при загрузке страницы
+        function checkAuthStatus() {
+            const savedUser = localStorage.getItem('currentUser');
+            if (savedUser) {
+                const user = JSON.parse(savedUser);
+                const users = JSON.parse(localStorage.getItem('users')) || [];
+                const foundUser = users.find(u => u.id === user.id);
+                
+                if (foundUser) {
+                    loginUser(foundUser);
+                }
+            }
+        }
+        
+        // Выход пользователя
+        function logout() {
+            currentUser = null;
+            localStorage.removeItem('currentUser');
+            
+            document.getElementById('auth').style.display = 'block';
+            document.getElementById('user-info-panel').style.display = 'none';
+            document.getElementById('game').style.display = 'none';
+            
+            // Сброс полей ввода
+            document.getElementById('login').value = '';
+            document.getElementById('password').value = '';
+        }
+        
+        // Показать сообщение об аутентификации
+        function showAuthMessage(message) {
+            const authMessage = document.getElementById('authMessage');
+            authMessage.textContent = message;
+            setTimeout(() => { authMessage.textContent = ''; }, 3000);
+        }
+        
+        // ==================== ИГРОВАЯ ДОСКА И ЛОГИКА ====================
+        
+        // Инициализация игровой доски
+        function initBoard() {
+            const board = document.getElementById('board');
+            board.innerHTML = '';
+            
+            // Создание клеток доски
+            for (let row = 0; row < 8; row++) {
+                for (let col = 0; col < 8; col++) {
+                    const cell = document.createElement('div');
+                    cell.className = 'cell';
+                    cell.classList.add((row + col) % 2 === 0 ? 'light' : 'dark');
+                    cell.dataset.row = row;
+                    cell.dataset.col = col;
+                    
+                    // Обработчик клика по клетке
+                    cell.addEventListener('click', () => handleCellClick(row, col));
+                    
+                    board.appendChild(cell);
+                }
+            }
+            
+            // Инициализация состояния доски
+            resetBoard();
+        }
+        
+        // Сброс доски в начальное состояние
+        function resetBoard() {
+            boardState = Array(8).fill().map(() => Array(8).fill(null));
+            
+            // Расстановка шашек для игрока 1 (внизу)
+            for (let row = 5; row < 8; row++) {
+                for (let col = 0; col < 8; col++) {
+                    if ((row + col) % 2 === 1) {
+                        boardState[row][col] = { player: 1, king: false };
+                    }
+                }
+            }
+            
+            // Расстановка шашек для игрока 2 (вверху)
+            for (let row = 0; row < 3; row++) {
+                for (let col = 0; col < 8; col++) {
+                    if ((row + col) % 2 === 1) {
+                        boardState[row][col] = { player: 2, king: false };
+                    }
+                }
+            }
+            
+            drawBoard();
+        }
+        
+        // Отрисовка доски на основе состояния
+        function drawBoard() {
+            // Очистка всех клеток
+            document.querySelectorAll('.cell').forEach(cell => {
+                cell.classList.remove('selected', 'available');
+                cell.innerHTML = '';
+            });
+            
+            // Отрисовка шашек
+            for (let row = 0; row < 8; row++) {
+                for (let col = 0; col < 8; col++) {
+                    const checker = boardState[row][col];
+                    if (checker) {
+                        const cell = document.querySelector(`.cell[data-row="${row}"][data-col="${col}"]`);
+                        const checkerElement = document.createElement('div');
+                        checkerElement.className = `checker player${checker.player}`;
+                        if (checker.king) checkerElement.classList.add('king');
+                        checkerElement.dataset.row = row;
+                        checkerElement.dataset.col = col;
+                        
+                        // Обработчик клика по шашке
+                        checkerElement.addEventListener('click', (e) => {
+                            e.stopPropagation();
+                            handleCheckerClick(row, col);
+                        });
+                        
+                        cell.appendChild(checkerElement);
+                    }
+                }
+            }
+            
+            // Обновление информации об игроках
+            updatePlayerInfo();
+        }
+        
+        // Обработчик клика по шашке
+        function handleCheckerClick(row, col) {
+            if (!gameActive || botThinking) return;
+            
+            const checker = boardState[row][col];
+            if (!checker || checker.player !== currentPlayer) return;
+            
+            // Если шашка уже выбрана, отмена выбора
+            if (selectedChecker && selectedChecker.row === row && selectedChecker.col === col) {
+                selectedChecker = null;
+                availableMoves = [];
+                drawBoard();
+                return;
+            }
+            
+            // Выбор новой шашки
+            selectedChecker = { row, col };
+            availableMoves = getAvailableMoves(row, col);
+            
+            // Проверка обязательного взятия
+            const allMoves = getAllPossibleMoves(currentPlayer);
+            const captureMoves = allMoves.filter(move => move.captures.length > 0);
+            
+            // Если есть обязательные взятия, фильтруем доступные ходы
+            if (captureMoves.length > 0) {
+                const hasCapture = availableMoves.some(move => move.captures.length > 0);
+                if (!hasCapture) {
+                    selectedChecker = null;
+                    availableMoves = [];
+                    showGameMessage('Вы обязаны совершить взятие!');
+                    return;
+                }
+                // Оставляем только ходы со взятием
+                availableMoves = availableMoves.filter(move => move.captures.length > 0);
+            }
+            
+            drawBoard();
+            
+            // Подсветка выбранной шашки и доступных ходов
+            const cell = document.querySelector(`.cell[data-row="${row}"][data-col="${col}"]`);
+            cell.classList.add('selected');
+            
+            availableMoves.forEach(move => {
+                const targetCell = document.querySelector(`.cell[data-row="${move.row}"][data-col="${move.col}"]`);
+                targetCell.classList.add('available');
+            });
+        }
+        
+        // Обработчик клика по клетке
+        function handleCellClick(row, col) {
+            if (!gameActive || !selectedChecker || botThinking) return;
+            
+            // Проверка, является ли клетка допустимым ходом
+            const move = availableMoves.find(m => m.row === row && m.col === col);
+            if (!move) return;
+            
+            // Выполнение хода
+            makeMove(selectedChecker.row, selectedChecker.col, row, col, move.captures);
+            
+            // Сброс выбора
+            selectedChecker = null;
+            availableMoves = [];
+            
+            // Проверка окончания игры
+            checkGameEnd();
+            
+            // Если игра против бота и сейчас ход бота
+            if (gameMode === 'bot' && currentPlayer === 2 && gameActive) {
+                botThinking = true;
+                setTimeout(makeBotMove, 500);
+            }
+        }
+        
+        // Получение доступных ходов для шашки
+        function getAvailableMoves(row, col) {
+            const checker = boardState[row][col];
+            if (!checker) return [];
+            
+            const moves = [];
+            const player = checker.player;
+            const isKing = checker.king;
+            const direction = player === 1 ? -1 : 1; // Игрок 1 ходит вверх, игрок 2 - вниз
+            
+            // Проверка обычных ходов и взятий
+            checkDirection(row, col, player, isKing, moves);
+            
+            return moves;
+        }
+        
+        // Проверка ходов в заданном направлении
+        function checkDirection(row, col, player, isKing, moves, captures = [], isFirst = true) {
+            const directions = [];
+            
+            // Определение направлений в зависимости от типа шашки
+            if (isKing) {
+                // Дамка ходит во всех направлениях
+                directions.push([-1, -1], [-1, 1], [1, -1], [1, 1]);
+            } else {
+                // Обычная шашка ходит только вперед
+                const forward = player === 1 ? -1 : 1;
+                directions.push([forward, -1], [forward, 1]);
+            }
+            
+            for (const [dr, dc] of directions) {
+                let newRow = row + dr;
+                let newCol = col + dc;
+                
+                // Проверка на границы доски
+                if (newRow < 0 || newRow >= 8 || newCol < 0 || newCol >= 8) continue;
+                
+                // Если клетка пуста и это первый шаг (не взятие)
+                if (!boardState[newRow][newCol] && captures.length === 0 && isFirst) {
+                    moves.push({ row: newRow, col: newCol, captures: [] });
+                }
+                // Если клетка занята шашкой противника
+                else if (boardState[newRow][newCol] && boardState[newRow][newCol].player !== player) {
+                    const jumpRow = newRow + dr;
+                    const jumpCol = newCol + dc;
+                    
+                    // Проверка, можно ли перепрыгнуть через шашку противника
+                    if (jumpRow >= 0 && jumpRow < 8 && jumpCol >= 0 && jumpCol < 8 && !boardState[jumpRow][jumpCol]) {
+                        // Проверка, что мы не прыгаем через уже взятую шашку
+                        if (!captures.some(c => c.row === newRow && c.col === newCol)) {
+                            const newCaptures = [...captures, { row: newRow, col: newCol }];
+                            moves.push({ row: jumpRow, col: jumpCol, captures: newCaptures });
+                            
+                            // Проверка дополнительных взятий
+                            checkDirection(jumpRow, jumpCol, player, isKing, moves, newCaptures, false);
+                        }
+                    }
+                }
+            }
+        }
+        
+        // Получение всех возможных ходов для игрока
+        function getAllPossibleMoves(player) {
+            const moves = [];
+            
+            for (let row = 0; row < 8; row++) {
+                for (let col = 0; col < 8; col++) {
+                    const checker = boardState[row][col];
+                    if (checker && checker.player === player) {
+                        const checkerMoves = getAvailableMoves(row, col);
+                        checkerMoves.forEach(move => {
+                            moves.push({
+                                from: { row, col },
+                                to: { row: move.row, col: move.col },
+                                captures: move.captures
+                            });
+                        });
+                    }
+                }
+            }
+            
+            return moves;
+        }
+        
+        // Выполнение хода
+        function makeMove(fromRow, fromCol, toRow, toCol, captures) {
+            const checker = boardState[fromRow][fromCol];
+            
+            // Перемещение шашки
+            boardState[toRow][toCol] = checker;
+            boardState[fromRow][fromCol] = null;
+            
+            // Удаление взятых шашек
+            captures.forEach(capture => {
+                boardState[capture.row][capture.col] = null;
+            });
+            
+            // Превращение в дамку при достижении противоположного края
+            if (!checker.king) {
+                if ((checker.player === 1 && toRow === 0) || (checker.player === 2 && toRow === 7)) {
+                    checker.king = true;
+                    showGameMessage('Шашка превратилась в дамку!');
+                }
+            }
+            
+            // Смена игрока, если нет дополнительных взятий
+            const additionalMoves = getAvailableMoves(toRow, toCol).filter(move => move.captures.length > 0);
+            
+            // Если есть дополнительные взятия этой же шашкой
+            if (captures.length > 0 && additionalMoves.length > 0) {
+                // Игрок продолжает ход этой же шашкой
+                selectedChecker = { row: toRow, col: toCol };
+                availableMoves = additionalMoves;
+                drawBoard();
+                
+                // Подсветка выбранной шашки и доступных ходов
+                const cell = document.querySelector(`.cell[data-row="${toRow}"][data-col="${toCol}"]`);
+                cell.classList.add('selected');
+                
+                availableMoves.forEach(move => {
+                    const targetCell = document.querySelector(`.cell[data-row="${move.row}"][data-col="${move.col}"]`);
+                    targetCell.classList.add('available');
+                });
+                
+                return; // Игрок продолжает ход
+            }
+            
+            // Смена игрока
+            currentPlayer = currentPlayer === 1 ? 2 : 1;
+            selectedChecker = null;
+            availableMoves = [];
+            
+            drawBoard();
+            updateGameStatus();
+        }
+        
+        // Проверка окончания игры
+        function checkGameEnd() {
+            const player1Moves = getAllPossibleMoves(1);
+            const player2Moves = getAllPossibleMoves(2);
+            
+            // Проверка наличия шашек у игроков
+            let player1Count = 0;
+            let player2Count = 0;
+            
+            for (let row = 0; row < 8; row++) {
+                for (let col = 0; col < 8; col++) {
+                    const checker = boardState[row][col];
+                    if (checker) {
+                        if (checker.player === 1) player1Count++;
+                        else player2Count++;
+                    }
+                }
+            }
+            
+            // Определение победителя
+            if (player1Count === 0 || player1Moves.length === 0) {
+                endGame(2); // Победил игрок 2
+                return;
+            }
+            
+            if (player2Count === 0 || player2Moves.length === 0) {
+                endGame(1); // Победил игрок 1
+                return;
+            }
+        }
+        
+        // Завершение игры
+        function endGame(winner) {
+            gameActive = false;
+            
+            let message = '';
+            if (gameMode === 'bot') {
+                if (winner === 1) {
+                    message = 'Вы победили!';
+                    if (currentUser) {
+                        updateUserStats('win');
+                    }
+                } else {
+                    message = 'Бот победил!';
+                    if (currentUser) {
+                        updateUserStats('loss');
+                    }
+                }
+            } else if (gameMode === 'local') {
+                message = `Победил игрок ${winner}!`;
+            } else {
+                message = `Победил игрок ${winner === 1 ? document.getElementById('player1-name').textContent : document.getElementById('player2-name').textContent}!`;
+                
+                // Обновление рейтинга для онлайн-игры
+                if (currentGame && currentGame.player1 && currentGame.player2) {
+                    updateRatings(winner);
+                }
+            }
+            
+            showGameMessage(message);
+            document.getElementById('game-status').textContent = `Игра завершена. ${message}`;
+            
+            // Сохранение истории игры
+            saveGameHistory(winner);
+        }
+        
+        // Обновление статистики пользователя
+        function updateUserStats(result) {
+            if (!currentUser) return;
+            
+            const users = JSON.parse(localStorage.getItem('users')) || [];
+            const index = users.findIndex(u => u.id === currentUser.id);
+            
+            if (index !== -1) {
+                if (result === 'win') {
+                    users[index].wins++;
+                    users[index].rating += 10;
+                } else if (result === 'loss') {
+                    users[index].losses++;
+                    users[index].rating = Math.max(0, users[index].rating - 10);
+                } else {
+                    users[index].draws++;
+                }
+                
+                localStorage.setItem('users', JSON.stringify(users));
+                currentUser = users[index];
+                localStorage.setItem('currentUser', JSON.stringify(currentUser));
+                
+                // Обновление отображения
+                document.getElementById('currentUserRating').textContent = currentUser.rating;
+                document.getElementById('userWins').textContent = currentUser.wins;
+                document.getElementById('userLosses').textContent = currentUser.losses;
+                document.getElementById('userDraws').textContent = currentUser.draws;
+            }
+        }
+        
+        // Обновление рейтингов для онлайн-игры
+        function updateRatings(winner) {
+            // Упрощенная система ELO
+            const k = 32;
+            const users = JSON.parse(localStorage.getItem('users')) || [];
+            
+            const player1Index = users.findIndex(u => u.username === currentGame.player1);
+            const player2Index = users.findIndex(u => u.username === currentGame.player2);
+            
+            if (player1Index !== -1 && player2Index !== -1) {
+                const r1 = users[player1Index].rating;
+                const r2 = users[player2Index].rating;
+                
+                const e1 = 1 / (1 + Math.pow(10, (r2 - r1) / 400));
+                const e2 = 1 / (1 + Math.pow(10, (r1 - r2) / 400));
+                
+                if (winner === 1) {
+                    users[player1Index].rating = Math.round(r1 + k * (1 - e1));
+                    users[player2Index].rating = Math.round(r2 + k * (0 - e2));
+                    users[player1Index].wins++;
+                    users[player2Index].losses++;
+                } else {
+                    users[player1Index].rating = Math.round(r1 + k * (0 - e1));
+                    users[player2Index].rating = Math.round(r2 + k * (1 - e2));
+                    users[player2Index].wins++;
+                    users[player1Index].losses++;
+                }
+                
+                localStorage.setItem('users', JSON.stringify(users));
+                
+                // Обновление текущего пользователя, если он участвовал
+                if (currentUser && (currentUser.username === currentGame.player1 || currentUser.username === currentGame.player2)) {
+                    const updatedUser = users.find(u => u.id === currentUser.id);
+                    if (updatedUser) {
+                        currentUser = updatedUser;
+                        localStorage.setItem('currentUser', JSON.stringify(currentUser));
+                        
+                        // Обновление отображения
+                        document.getElementById('currentUserRating').textContent = currentUser.rating;
+                        document.getElementById('userWins').textContent = currentUser.wins;
+                        document.getElementById('userLosses').textContent = currentUser.losses;
+                    }
+                }
+            }
+        }
+        
+        // Сохранение истории игры
+        function saveGameHistory(winner) {
+            const history = JSON.parse(localStorage.getItem('gameHistory')) || [];
+            
+            const gameRecord = {
+                id: Date.now(),
+                date: new Date().toISOString(),
+                mode: gameMode,
+                player1: document.getElementById('player1-name').textContent,
+                player2: document.getElementById('player2-name').textContent,
+                winner: winner,
+                player1Rating: document.getElementById('player1-rating').textContent.replace('Рейтинг: ', ''),
+                player2Rating: document.getElementById('player2-rating').textContent.replace('Рейтинг: ', '')
+            };
+            
+            history.unshift(gameRecord);
+            if (history.length > 50) history.pop(); // Ограничение истории
+            localStorage.setItem('gameHistory', JSON.stringify(history));
+        }
+        
+        // ==================== БОТ ====================
+        
+        // Ход бота
+        function makeBotMove() {
+            if (!gameActive || currentPlayer !== 2 || botThinking === false) return;
+            
+            const difficulty = document.getElementById('botDifficulty').value;
+            let move;
+            
+            // Выбор алгоритма в зависимости от сложности
+            if (difficulty === 'easy') {
+                move = getRandomBotMove();
+            } else if (difficulty === 'medium') {
+                move = getMinimaxBotMove(2);
+            } else { // hard
+                move = getMinimaxBotMove(4);
+            }
+            
+            if (move) {
+                // Имитация размышлений бота
+                setTimeout(() => {
+                    makeMove(move.from.row, move.from.col, move.to.row, move.to.col, move.captures);
+                    botThinking = false;
+                    
+                    // Проверка окончания игры
+                    checkGameEnd();
+                }, 500);
+            } else {
+                botThinking = false;
+            }
+        }
+        
+        // Случайный ход бота (легкий уровень)
+        function getRandomBotMove() {
+            const moves = getAllPossibleMoves(2);
+            if (moves.length === 0) return null;
+            
+            // Приоритет взятиям
+            const captureMoves = moves.filter(m => m.captures.length > 0);
+            if (captureMoves.length > 0) {
+                return captureMoves[Math.floor(Math.random() * captureMoves.length)];
+            }
+            
+            return moves[Math.floor(Math.random() * moves.length)];
+        }
+        
+        // Минимакс алгоритм для бота
+        function getMinimaxBotMove(depth) {
+            const moves = getAllPossibleMoves(2);
+            if (moves.length === 0) return null;
+            
+            let bestMove = null;
+            let bestValue = -Infinity;
+            
+            // Приоритет взятиям
+            const captureMoves = moves.filter(m => m.captures.length > 0);
+            const movesToCheck = captureMoves.length > 0 ? captureMoves : moves;
+            
+            for (const move of movesToCheck) {
+                // Сохраняем текущее состояние доски
+                const boardCopy = JSON.parse(JSON.stringify(boardState));
+                
+                // Делаем ход
+                makeMove(move.from.row, move.from.col, move.to.row, move.to.col, move.captures);
+                const moveValue = minimax(depth - 1, -Infinity, Infinity, false);
+                
+                // Восстанавливаем доску
+                boardState = boardCopy;
+                
+                if (moveValue > bestValue) {
+                    bestValue = moveValue;
+                    bestMove = move;
+                }
+            }
+            
+            return bestMove || getRandomBotMove();
+        }
+        
+        // Минимакс с альфа-бета отсечением
+        function minimax(depth, alpha, beta, isMaximizing) {
+            if (depth === 0) {
+                return evaluateBoard();
+            }
+            
+            const player = isMaximizing ? 2 : 1;
+            const moves = getAllPossibleMoves(player);
+            
+            if (moves.length === 0) {
+                return isMaximizing ? -1000 : 1000; // Шах или мат
+            }
+            
+            if (isMaximizing) {
+                let maxEval = -Infinity;
+                for (const move of moves) {
+                    const boardCopy = JSON.parse(JSON.stringify(boardState));
+                    makeMove(move.from.row, move.from.col, move.to.row, move.to.col, move.captures);
+                    
+                    const evalResult = minimax(depth - 1, alpha, beta, false);
+                    maxEval = Math.max(maxEval, evalResult);
+                    
+                    boardState = boardCopy;
+                    
+                    alpha = Math.max(alpha, evalResult);
+                    if (beta <= alpha) break; // Альфа-бета отсечение
+                }
+                return maxEval;
+            } else {
+                let minEval = Infinity;
+                for (const move of moves) {
+                    const boardCopy = JSON.parse(JSON.stringify(boardState));
+                    makeMove(move.from.row, move.from.col, move.to.row, move.to.col, move.captures);
+                    
+                    const evalResult = minimax(depth - 1, alpha, beta, true);
+                    minEval = Math.min(minEval, evalResult);
+                    
+                    boardState = boardCopy;
+                    
+                    beta = Math.min(beta, evalResult);
+                    if (beta <= alpha) break; // Альфа-бета отсечение
+                }
+                return minEval;
+            }
+        }
+        
+        // Оценка позиции на доске
+        function evaluateBoard() {
+            let score = 0;
+            
+            for (let row = 0; row < 8; row++) {
+                for (let col = 0; col < 8; col++) {
+                    const checker = boardState[row][col];
+                    if (checker) {
+                        let value = checker.king ? 3 : 1;
+                        if (checker.player === 2) {
+                            score += value;
+                        } else {
+                            score -= value;
+                        }
+                        
+                        // Бонус за центральные позиции
+                        if (row >= 3 && row <= 4 && col >= 3 && col <= 4) {
+                            score += checker.player === 2 ? 0.1 : -0.1;
+                        }
+                        
+                        // Бонус за защищенность (шашка рядом с краем)
+                        if (col === 0 || col === 7) {
+                            score += checker.player === 2 ? 0.05 : -0.05;
+                        }
+                    }
+                }
+            }
+            
+            return score;
+        }
+        
+        // ==================== ИГРОВЫЕ РЕЖИМЫ ====================
+        
+        // Установка режима игры
+        function setGameMode(mode) {
+            gameMode = mode;
+            
+            // Обновление активной кнопки
+            document.querySelectorAll('.mode-btn').forEach(btn => btn.classList.remove('active'));
+            event.target.classList.add('active');
+            
+            // Показать/скрыть элементы управления ботом
+            document.getElementById('bot-controls').style.display = mode === 'bot' ? 'block' : 'none';
+            
+            // Обновление списка пользователей для онлайн-режима
+            if (mode === 'online') {
+                updateUsersList();
+            }
+            
+            // Начало новой игры в выбранном режиме
+            startNewGame();
+        }
+        
+        // Начало новой игры
+        function startNewGame() {
+            gameActive = true;
+            currentPlayer = 1;
+            selectedChecker = null;
+            availableMoves = [];
+            botThinking = false;
+            
+            // Сброс доски
+            resetBoard();
+            
+            // Настройка игры в зависимости от режима
+            if (gameMode === 'bot') {
+                document.getElementById('player1-name').textContent = currentUser ? currentUser.username : 'Игрок';
+                document.getElementById('player1-rating').textContent = currentUser ? `Рейтинг: ${currentUser.rating}` : 'Рейтинг: 0';
+                document.getElementById('player2-name').textContent = 'Бот';
+                document.getElementById('player2-rating').textContent = 'Уровень: ' + document.getElementById('botDifficulty').value;
+                
+                // Игрок всегда ходит первым против бота
+                currentPlayer = 1;
+            } 
+            else if (gameMode === 'local') {
+                document.getElementById('player1-name').textContent = 'Игрок 1';
+                document.getElementById('player1-rating').textContent = 'Локальная игра';
+                document.getElementById('player2-name').textContent = 'Игрок 2';
+                document.getElementById('player2-rating').textContent = 'Локальная игра';
+            }
+            else if (gameMode === 'online') {
+                document.getElementById('player1-name').textContent = currentUser ? currentUser.username : 'Игрок';
+                document.getElementById('player1-rating').textContent = currentUser ? `Рейтинг: ${currentUser.rating}` : 'Рейтинг: 0';
+                document.getElementById('player2-name').textContent = 'Ожидание соперника...';
+                document.getElementById('player2-rating').textContent = 'Рейтинг: ?';
+                
+                // Создание приглашения или ожидание игры
+                createOnlineGame();
+            }
+            
+            updateGameStatus();
+            showGameMessage('Новая игра началась!');
+        }
+        
+        // Создание онлайн-игры
+        function createOnlineGame() {
+            if (!currentUser) return;
+            
+            // Получение активных игр из LocalStorage
+            const games = JSON.parse(localStorage.getItem('games')) || [];
+            
+            // Поиск ожидающих игр
+            const waitingGame = games.find(g => g.status === 'waiting' && g.player1 !== currentUser.username);
+            
+            if (waitingGame) {
+                // Присоединение к существующей игре
+                waitingGame.player2 = currentUser.username;
+                waitingGame.status = 'active';
+                waitingGame.currentPlayer = 1;
+                currentGame = waitingGame;
+                
+                // Обновление отображения
+                document.getElementById('player2-name').textContent = waitingGame.player1;
+                
+                // Загрузка рейтинга соперника
+                const users = JSON.parse(localStorage.getItem('users')) || [];
+                const opponent = users.find(u => u.username === waitingGame.player1);
+                if (opponent) {
+                    document.getElementById('player2-rating').textContent = `Рейтинг: ${opponent.rating}`;
+                }
+                
+                showGameMessage(`Вы присоединились к игре с ${waitingGame.player1}`);
+            } else {
+                // Создание новой игры
+                currentGame = {
+                    id: Date.now(),
+                    player1: currentUser.username,
+                    player2: null,
+                    status: 'waiting',
+                    boardState: boardState,
+                    currentPlayer: 1,
+                    lastUpdate: Date.now()
+                };
+                
+                games.push(currentGame);
+                showGameMessage('Ожидание соперника...');
+            }
+            
+            localStorage.setItem('games', JSON.stringify(games));
+        }
+        
+        // Проверка приглашений в игре
+        function checkGameInvites() {
+            if (gameMode !== 'online' || !currentUser) return;
+            
+            const games = JSON.parse(localStorage.getItem('games')) || [];
+            
+            // Проверка, есть ли обновления в текущей игре
+            if (currentGame) {
+                const updatedGame = games.find(g => g.id === currentGame.id);
+                if (updatedGame && updatedGame.lastUpdate > currentGame.lastUpdate) {
+                    // Обновление игры
+                    currentGame = updatedGame;
+                    
+                    // Обновление доски, если игра активна
+                    if (currentGame.status === 'active' && currentGame.boardState) {
+                        boardState = currentGame.boardState;
+                        currentPlayer = currentGame.currentPlayer;
+                        drawBoard();
+                        updateGameStatus();
+                        
+                        // Проверка окончания игры
+                        checkGameEnd();
+                    }
+                }
+            }
+            
+            // Проверка приглашений
+            const invite = games.find(g => 
+                g.player2 === currentUser.username && 
+                g.status === 'invited' &&
+                (!currentGame || g.id !== currentGame.id)
+            );
+            
+            if (invite) {
+                if (confirm(`${invite.player1} приглашает вас в игру. Принять?`)) {
+                    // Принятие приглашения
+                    invite.status = 'active';
+                    invite.currentPlayer = 1;
+                    currentGame = invite;
+                    
+                    // Обновление отображения
+                    document.getElementById('player1-name').textContent = invite.player2;
+                    document.getElementById('player2-name').textContent = invite.player1;
+                    
+                    // Загрузка рейтинга соперника
+                    const users = JSON.parse(localStorage.getItem('users')) || [];
+                    const opponent = users.find(u => u.username === invite.player1);
+                    if (opponent) {
+                        document.getElementById('player2-rating').textContent = `Рейтинг: ${opponent.rating}`;
+                    }
+                    
+                    // Обновление в хранилище
+                    localStorage.setItem('games', JSON.stringify(games));
+                    
+                    showGameMessage(`Вы приняли приглашение от ${invite.player1}`);
+                    startNewGame();
+                } else {
+                    // Отклонение приглашения
+                    invite.status = 'rejected';
+                    localStorage.setItem('games', JSON.stringify(games));
+                }
+            }
+        }
+        
+        // ==================== ПОЛЬЗОВАТЕЛИ И ЧАТ ====================
+        
+        // Обновление списка пользователей
+        function updateUsersList() {
+            if (!currentUser) return;
+            
+            const usersList = document.getElementById('users-list');
+            usersList.innerHTML = '';
+            
+            // Получение пользователей из LocalStorage
+            const users = JSON.parse(localStorage.getItem('users')) || [];
+            
+            // Фильтрация и сортировка по рейтингу
+            const onlineUsers = users
+                .filter(u => u.id !== currentUser.id && (Date.now() - u.lastOnline) < 30000) // Онлайн за последние 30 секунд
+                .sort((a, b) => b.rating - a.rating);
+            
+            // Добавление текущего пользователя в начало
+            const currentUserElement = document.createElement('div');
+            currentUserElement.className = 'user-item current-user';
+            currentUserElement.innerHTML = `
+                <div class="user-info">
+                    <div class="user-name">${currentUser.username} (Вы)</div>
+                    <div class="user-rating">Рейтинг: ${currentUser.rating}</div>
+                </div>
+                <div class="user-status">● Онлайн</div>
+            `;
+            usersList.appendChild(currentUserElement);
+            
+            // Добавление других пользователей
+            onlineUsers.forEach(user => {
+                const userElement = document.createElement('div');
+                userElement.className = 'user-item online';
+                userElement.innerHTML = `
+                    <div class="user-info">
+                        <div class="user-name">${user.username}</div>
+                        <div class="user-rating">Рейтинг: ${user.rating}</div>
+                    </div>
+                    <button class="invite-btn" onclick="inviteUser('${user.username}')">Пригласить</button>
+                `;
+                usersList.appendChild(userElement);
+            });
+            
+            // Обновление времени последней активности текущего пользователя
+            currentUser.lastOnline = Date.now();
+            const usersUpdated = JSON.parse(localStorage.getItem('users')) || [];
+            const index = usersUpdated.findIndex(u => u.id === currentUser.id);
+            if (index !== -1) {
+                usersUpdated[index].lastOnline = currentUser.lastOnline;
+                localStorage.setItem('users', JSON.stringify(usersUpdated));
+            }
+        }
+        
+        // Обновление онлайн-статуса
+        function updateOnlineStatus() {
+            if (!currentUser) return;
+            
+            // Обновление времени последней активности
+            currentUser.lastOnline = Date.now();
+            const users = JSON.parse(localStorage.getItem('users')) || [];
+            const index = users.findIndex(u => u.id === currentUser.id);
+            if (index !== -1) {
+                users[index].lastOnline = currentUser.lastOnline;
+                localStorage.setItem('users', JSON.stringify(users));
+            }
+            
+            // Обновление списка пользователей в онлайн-режиме
+            if (gameMode === 'online') {
+                updateUsersList();
+            }
+            
+            // Обновление онлайн-игры, если она активна
+            if (gameMode === 'online' && currentGame && gameActive) {
+                const games = JSON.parse(localStorage.getItem('games')) || [];
+                const gameIndex = games.findIndex(g => g.id === currentGame.id);
+                
+                if (gameIndex !== -1) {
+                    // Обновление состояния игры
+                    games[gameIndex].boardState = boardState;
+                    games[gameIndex].currentPlayer = currentPlayer;
+                    games[gameIndex].lastUpdate = Date.now();
+                    
+                    localStorage.setItem('games', JSON.stringify(games));
+                    currentGame = games[gameIndex];
+                }
+            }
+        }
+        
+        // Приглашение пользователя в игру
+        function inviteUser(username) {
+            if (gameMode !== 'online') {
+                showGameMessage('Переключитесь в онлайн-режим для приглашения игроков');
+                return;
+            }
+            
+            const games = JSON.parse(localStorage.getItem('games')) || [];
+            
+            // Проверка, есть ли уже активная игра
+            const activeGame = games.find(g => 
+                (g.player1 === currentUser.username || g.player2 === currentUser.username) &&
+                g.status === 'active'
+            );
+            
+            if (activeGame) {
+                showGameMessage('У вас уже есть активная игра');
+                return;
+            }
+            
+            // Создание приглашения
+            const invite = {
+                id: Date.now(),
+                player1: currentUser.username,
+                player2: username,
+                status: 'invited',
+                boardState: null,
+                currentPlayer: 1,
+                lastUpdate: Date.now()
+            };
+            
+            games.push(invite);
+            localStorage.setItem('games', JSON.stringify(games));
+            
+            showGameMessage(`Приглашение отправлено ${username}`);
+        }
+        
+        // Загрузка сообщений чата
+        function loadChatMessages() {
+            const chatMessages = document.getElementById('chat-messages');
+            chatMessages.innerHTML = '';
+            
+            // Получение сообщений из LocalStorage
+            const messages = JSON.parse(localStorage.getItem('chatMessages')) || [];
+            
+            // Ограничение количества отображаемых сообщений
+            const recentMessages = messages.slice(-50);
+            
+            recentMessages.forEach(msg => {
+                const messageElement = document.createElement('div');
+                messageElement.className = 'message';
+                
+                const time = new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                
+                messageElement.innerHTML = `
+                    <div>
+                        <span class="sender">${msg.sender}:</span>
+                        <span class="text">${msg.text}</span>
+                        <span class="time">${time}</span>
+                    </div>
+                `;
+                
+                chatMessages.appendChild(messageElement);
+            });
+            
+            // Прокрутка вниз
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        }
+        
+        // Отправка сообщения в чат
+        function sendMessage() {
+            const messageInput = document.getElementById('message');
+            const text = messageInput.value.trim();
+            
+            if (!text || !currentUser) return;
+            
+            // Создание сообщения
+            const message = {
+                sender: currentUser.username,
+                text: text,
+                timestamp: Date.now()
+            };
+            
+            // Сохранение в LocalStorage
+            const messages = JSON.parse(localStorage.getItem('chatMessages')) || [];
+            messages.push(message);
+            
+            // Ограничение количества сообщений
+            if (messages.length > 200) {
+                messages.splice(0, messages.length - 200);
+            }
+            
+            localStorage.setItem('chatMessages', JSON.stringify(messages));
+            
+            // Очистка поля ввода
+            messageInput.value = '';
+            
+            // Обновление чата
+            loadChatMessages();
+        }
+        
+        // ==================== ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ====================
+        
+        // Обновление информации об игроках
+        function updatePlayerInfo() {
+            // Подсветка активного игрока
+            document.getElementById('player1-card').classList.toggle('active', currentPlayer === 1);
+            document.getElementById('player2-card').classList.toggle('active', currentPlayer === 2);
+        }
+        
+        // Обновление статуса игры
+        function updateGameStatus() {
+            let status = '';
+            
+            if (!gameActive) {
+                status = 'Игра завершена';
+            } else if (gameMode === 'bot') {
+                status = currentPlayer === 1 ? 'Ваш ход' : 'Ход бота...';
+            } else if (gameMode === 'local') {
+                status = `Ход игрока ${currentPlayer}`;
+            } else if (gameMode === 'online') {
+                if (currentGame && currentGame.status === 'waiting') {
+                    status = 'Ожидание соперника...';
+                } else {
+                    const playerName = currentPlayer === 1 ? 
+                        document.getElementById('player1-name').textContent : 
+                        document.getElementById('player2-name').textContent;
+                    status = `Ход игрока: ${playerName}`;
+                }
+            }
+            
+            document.getElementById('game-status').textContent = status;
+        }
+        
+        // Показать игровое сообщение
+        function showGameMessage(message) {
+            const gameStatus = document.getElementById('game-status');
+            const originalText = gameStatus.textContent;
+            
+            gameStatus.textContent = message;
+            gameStatus.style.color = '#f1c40f';
+            
+            setTimeout(() => {
+                gameStatus.textContent = originalText;
+                gameStatus.style.color = '';
+            }, 3000);
+        }
+        
+        // Сдача в игре
+        function surrender() {
+            if (!gameActive) return;
+            
+            if (confirm('Вы уверены, что хотите сдаться?')) {
+                if (gameMode === 'bot') {
+                    endGame(2); // Бот побеждает
+                } else if (gameMode === 'local') {
+                    endGame(currentPlayer === 1 ? 2 : 1); // Противник побеждает
+                } else if (gameMode === 'online') {
+                    endGame(currentPlayer === 1 ? 2 : 1); // Противник побеждает
+                }
+            }
+        }
+    </script>
+</body>
+</html>
