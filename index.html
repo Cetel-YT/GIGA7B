@@ -45,7 +45,6 @@
             font-size: 1.2rem;
         }
         
-        /* Панель аутентификации */
         #auth {
             background: rgba(30, 30, 46, 0.9);
             border-radius: 15px;
@@ -131,7 +130,6 @@
             color: #ff6b6b;
         }
         
-        /* Основной интерфейс игры */
         #game {
             display: none;
             grid-template-columns: 1fr 350px;
@@ -139,7 +137,6 @@
             margin-top: 20px;
         }
         
-        /* Игровая доска */
         #game-header {
             display: flex;
             justify-content: space-between;
@@ -278,7 +275,6 @@
             text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.8);
         }
         
-        /* Боковая панель */
         #sidebar {
             display: flex;
             flex-direction: column;
@@ -300,7 +296,6 @@
             border-bottom: 1px solid #444;
         }
         
-        /* Чат */
         #chat-messages {
             height: 300px;
             overflow-y: auto;
@@ -344,7 +339,6 @@
             color: #fff;
         }
         
-        /* Список пользователей */
         #users-list {
             max-height: 300px;
             overflow-y: auto;
@@ -398,7 +392,6 @@
             background: rgba(15, 204, 69, 0.1);
         }
         
-        /* Панель управления игрой */
         #game-controls {
             display: flex;
             flex-direction: column;
@@ -448,7 +441,6 @@
             border-color: #0fcc45;
         }
         
-        /* Информация о пользователе */
         #user-info-panel {
             display: flex;
             justify-content: space-between;
@@ -479,7 +471,22 @@
             color: #aaa;
         }
         
-        /* Адаптивность */
+        .online-indicator {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            margin-right: 5px;
+        }
+        
+        .online {
+            background-color: #2ecc71;
+        }
+        
+        .offline {
+            background-color: #e74c3c;
+        }
+        
         @media (max-width: 1200px) {
             #game {
                 grid-template-columns: 1fr;
@@ -525,7 +532,6 @@
             <p class="subtitle">Играйте с друзьями или с ботом. Повышайте свой рейтинг!</p>
         </header>
         
-        <!-- Панель аутентификации -->
         <div id="auth">
             <h2>Вход / Регистрация</h2>
             <div class="input-group">
@@ -543,7 +549,6 @@
             <div id="authMessage"></div>
         </div>
         
-        <!-- Основной интерфейс игры (скрыт до входа) -->
         <div id="user-info-panel" style="display: none;">
             <div>
                 <h2>Привет, <span id="currentUserName"></span>!</h2>
@@ -567,7 +572,6 @@
         </div>
         
         <div id="game">
-            <!-- Левая часть: игровое поле и управление -->
             <div>
                 <div id="game-header">
                     <div id="player-info">
@@ -616,11 +620,11 @@
                     <div class="controls-group">
                         <button class="btn btn-primary" onclick="startNewGame()">Новая игра</button>
                         <button class="btn btn-secondary" onclick="surrender()">Сдаться</button>
+                        <button class="btn btn-secondary" onclick="checkForOnlineUpdates()">Проверить обновления</button>
                     </div>
                 </div>
             </div>
             
-            <!-- Правая часть: чат и список пользователей -->
             <div id="sidebar">
                 <div class="panel">
                     <h3>Чат</h3>
@@ -632,8 +636,14 @@
                 </div>
                 
                 <div class="panel">
-                    <h3>Онлайн пользователи</h3>
+                    <h3>Онлайн пользователи <span id="online-count">(0)</span></h3>
                     <div id="users-list"></div>
+                </div>
+                
+                <div class="panel" id="online-game-panel" style="display: none;">
+                    <h3>Текущая онлайн-игра</h3>
+                    <div id="online-game-info"></div>
+                    <button class="btn btn-secondary" onclick="leaveOnlineGame()" style="width: 100%; margin-top: 10px;">Покинуть игру</button>
                 </div>
             </div>
         </div>
@@ -642,40 +652,50 @@
     <script>
         // Глобальные переменные
         let currentUser = null;
-        let gameMode = 'bot'; // 'bot', 'online', 'local'
+        let gameMode = 'bot';
         let currentGame = null;
         let selectedChecker = null;
         let availableMoves = [];
         let boardState = [];
-        let currentPlayer = 1; // 1 или 2
+        let currentPlayer = 1;
         let gameActive = false;
-        let onlineUsers = [];
-        let chatMessages = [];
         let botThinking = false;
+        let onlineCheckInterval = null;
+        let chatCheckInterval = null;
+        let lastGameUpdate = 0;
+        
+        // Константы для LocalStorage ключей
+        const STORAGE_KEYS = {
+            USERS: 'checkers_users',
+            GAMES: 'checkers_games',
+            CHAT: 'checkers_chat',
+            CURRENT_USER: 'checkers_current_user',
+            GAME_HISTORY: 'checkers_game_history'
+        };
         
         // Инициализация при загрузке страницы
         document.addEventListener('DOMContentLoaded', function() {
             checkAuthStatus();
             initBoard();
             loadChatMessages();
-            setInterval(updateOnlineStatus, 3000); // Эмуляция WebSocket для онлайн-статуса
-            setInterval(checkGameInvites, 2000); // Эмуляция WebSocket для проверки приглашений
+            
+            // Запуск интервалов для эмуляции онлайн-режима
+            onlineCheckInterval = setInterval(updateOnlineStatus, 2000);
+            chatCheckInterval = setInterval(loadChatMessages, 3000);
         });
         
         // ==================== АУТЕНТИФИКАЦИЯ ====================
         
-        // Простая хэш-функция для паролей (только для демо)
         function hashPassword(password) {
             let hash = 0;
             for (let i = 0; i < password.length; i++) {
                 const char = password.charCodeAt(i);
                 hash = ((hash << 5) - hash) + char;
-                hash = hash & hash; // Преобразование в 32-битное целое число
+                hash = hash & hash;
             }
             return hash.toString();
         }
         
-        // Регистрация нового пользователя
         function register() {
             const username = document.getElementById('login').value.trim();
             const password = document.getElementById('password').value.trim();
@@ -695,16 +715,13 @@
                 return;
             }
             
-            // Получение пользователей из LocalStorage
-            const users = JSON.parse(localStorage.getItem('users')) || [];
+            const users = JSON.parse(localStorage.getItem(STORAGE_KEYS.USERS)) || [];
             
-            // Проверка, существует ли пользователь
             if (users.find(u => u.username === username)) {
                 showAuthMessage('Пользователь с таким именем уже существует');
                 return;
             }
             
-            // Создание нового пользователя
             const newUser = {
                 id: Date.now(),
                 username: username,
@@ -713,17 +730,16 @@
                 wins: 0,
                 losses: 0,
                 draws: 0,
-                lastOnline: Date.now()
+                lastOnline: Date.now(),
+                status: 'online'
             };
             
             users.push(newUser);
-            localStorage.setItem('users', JSON.stringify(users));
+            localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(users));
             
-            // Автоматический вход после регистрации
             loginUser(newUser);
         }
         
-        // Вход пользователя
         function login() {
             const username = document.getElementById('login').value.trim();
             const password = document.getElementById('password').value.trim();
@@ -733,11 +749,9 @@
                 return;
             }
             
-            // Получение пользователей из LocalStorage
-            const users = JSON.parse(localStorage.getItem('users')) || [];
+            const users = JSON.parse(localStorage.getItem(STORAGE_KEYS.USERS)) || [];
             const passwordHash = hashPassword(password);
             
-            // Поиск пользователя
             const user = users.find(u => u.username === username && u.passwordHash === passwordHash);
             
             if (user) {
@@ -747,23 +761,20 @@
             }
         }
         
-        // Вход пользователя и обновление интерфейса
         function loginUser(user) {
             currentUser = user;
             currentUser.lastOnline = Date.now();
+            currentUser.status = 'online';
             
-            // Обновление пользователя в хранилище
-            const users = JSON.parse(localStorage.getItem('users')) || [];
+            const users = JSON.parse(localStorage.getItem(STORAGE_KEYS.USERS)) || [];
             const index = users.findIndex(u => u.id === user.id);
             if (index !== -1) {
                 users[index] = currentUser;
-                localStorage.setItem('users', JSON.stringify(users));
+                localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(users));
             }
             
-            // Сохранение текущего пользователя в LocalStorage
-            localStorage.setItem('currentUser', JSON.stringify(currentUser));
+            localStorage.setItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify(currentUser));
             
-            // Обновление интерфейса
             document.getElementById('auth').style.display = 'none';
             document.getElementById('user-info-panel').style.display = 'flex';
             document.getElementById('game').style.display = 'grid';
@@ -774,22 +785,20 @@
             document.getElementById('userLosses').textContent = currentUser.losses;
             document.getElementById('userDraws').textContent = currentUser.draws;
             
-            // Обновление списка пользователей
             updateUsersList();
-            
-            // Загрузка чата
             loadChatMessages();
             
-            // Начало новой игры по умолчанию
+            // Проверка активных онлайн-игр
+            checkActiveOnlineGames();
+            
             setTimeout(() => startNewGame(), 500);
         }
         
-        // Проверка статуса аутентификации при загрузке страницы
         function checkAuthStatus() {
-            const savedUser = localStorage.getItem('currentUser');
+            const savedUser = localStorage.getItem(STORAGE_KEYS.CURRENT_USER);
             if (savedUser) {
                 const user = JSON.parse(savedUser);
-                const users = JSON.parse(localStorage.getItem('users')) || [];
+                const users = JSON.parse(localStorage.getItem(STORAGE_KEYS.USERS)) || [];
                 const foundUser = users.find(u => u.id === user.id);
                 
                 if (foundUser) {
@@ -798,21 +807,34 @@
             }
         }
         
-        // Выход пользователя
         function logout() {
+            if (currentUser) {
+                // Обновление статуса пользователя
+                const users = JSON.parse(localStorage.getItem(STORAGE_KEYS.USERS)) || [];
+                const index = users.findIndex(u => u.id === currentUser.id);
+                if (index !== -1) {
+                    users[index].status = 'offline';
+                    users[index].lastOnline = Date.now();
+                    localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(users));
+                }
+                
+                // Выход из текущей онлайн-игры
+                if (gameMode === 'online' && currentGame) {
+                    leaveOnlineGame();
+                }
+            }
+            
             currentUser = null;
-            localStorage.removeItem('currentUser');
+            localStorage.removeItem(STORAGE_KEYS.CURRENT_USER);
             
             document.getElementById('auth').style.display = 'block';
             document.getElementById('user-info-panel').style.display = 'none';
             document.getElementById('game').style.display = 'none';
             
-            // Сброс полей ввода
             document.getElementById('login').value = '';
             document.getElementById('password').value = '';
         }
         
-        // Показать сообщение об аутентификации
         function showAuthMessage(message) {
             const authMessage = document.getElementById('authMessage');
             authMessage.textContent = message;
@@ -821,12 +843,10 @@
         
         // ==================== ИГРОВАЯ ДОСКА И ЛОГИКА ====================
         
-        // Инициализация игровой доски
         function initBoard() {
             const board = document.getElementById('board');
             board.innerHTML = '';
             
-            // Создание клеток доски
             for (let row = 0; row < 8; row++) {
                 for (let col = 0; col < 8; col++) {
                     const cell = document.createElement('div');
@@ -835,22 +855,18 @@
                     cell.dataset.row = row;
                     cell.dataset.col = col;
                     
-                    // Обработчик клика по клетке
                     cell.addEventListener('click', () => handleCellClick(row, col));
                     
                     board.appendChild(cell);
                 }
             }
             
-            // Инициализация состояния доски
             resetBoard();
         }
         
-        // Сброс доски в начальное состояние
         function resetBoard() {
             boardState = Array(8).fill().map(() => Array(8).fill(null));
             
-            // Расстановка шашек для игрока 1 (внизу)
             for (let row = 5; row < 8; row++) {
                 for (let col = 0; col < 8; col++) {
                     if ((row + col) % 2 === 1) {
@@ -859,7 +875,6 @@
                 }
             }
             
-            // Расстановка шашек для игрока 2 (вверху)
             for (let row = 0; row < 3; row++) {
                 for (let col = 0; col < 8; col++) {
                     if ((row + col) % 2 === 1) {
@@ -871,15 +886,12 @@
             drawBoard();
         }
         
-        // Отрисовка доски на основе состояния
         function drawBoard() {
-            // Очистка всех клеток
             document.querySelectorAll('.cell').forEach(cell => {
                 cell.classList.remove('selected', 'available');
                 cell.innerHTML = '';
             });
             
-            // Отрисовка шашек
             for (let row = 0; row < 8; row++) {
                 for (let col = 0; col < 8; col++) {
                     const checker = boardState[row][col];
@@ -891,7 +903,6 @@
                         checkerElement.dataset.row = row;
                         checkerElement.dataset.col = col;
                         
-                        // Обработчик клика по шашке
                         checkerElement.addEventListener('click', (e) => {
                             e.stopPropagation();
                             handleCheckerClick(row, col);
@@ -902,18 +913,35 @@
                 }
             }
             
-            // Обновление информации об игроках
             updatePlayerInfo();
         }
         
-        // Обработчик клика по шашке
         function handleCheckerClick(row, col) {
             if (!gameActive || botThinking) return;
             
-            const checker = boardState[row][col];
-            if (!checker || checker.player !== currentPlayer) return;
+            // Для онлайн-игры проверяем, что это ход текущего пользователя
+            if (gameMode === 'online' && currentGame) {
+                const isPlayer1 = currentUser.username === currentGame.player1;
+                const currentPlayerInGame = currentGame.currentPlayer;
+                
+                if ((isPlayer1 && currentPlayerInGame !== 1) || (!isPlayer1 && currentPlayerInGame !== 2)) {
+                    showGameMessage('Сейчас не ваш ход!');
+                    return;
+                }
+            }
             
-            // Если шашка уже выбрана, отмена выбора
+            const checker = boardState[row][col];
+            if (!checker) return;
+            
+            // Проверка, что игрок ходит своей шашкой
+            const isPlayer1 = gameMode === 'online' && currentGame ? 
+                currentUser.username === currentGame.player1 : 
+                currentPlayer === 1;
+            
+            if ((isPlayer1 && checker.player !== 1) || (!isPlayer1 && checker.player !== 2)) {
+                return;
+            }
+            
             if (selectedChecker && selectedChecker.row === row && selectedChecker.col === col) {
                 selectedChecker = null;
                 availableMoves = [];
@@ -921,15 +949,12 @@
                 return;
             }
             
-            // Выбор новой шашки
             selectedChecker = { row, col };
             availableMoves = getAvailableMoves(row, col);
             
-            // Проверка обязательного взятия
-            const allMoves = getAllPossibleMoves(currentPlayer);
+            const allMoves = getAllPossibleMoves(checker.player);
             const captureMoves = allMoves.filter(move => move.captures.length > 0);
             
-            // Если есть обязательные взятия, фильтруем доступные ходы
             if (captureMoves.length > 0) {
                 const hasCapture = availableMoves.some(move => move.captures.length > 0);
                 if (!hasCapture) {
@@ -938,13 +963,11 @@
                     showGameMessage('Вы обязаны совершить взятие!');
                     return;
                 }
-                // Оставляем только ходы со взятием
                 availableMoves = availableMoves.filter(move => move.captures.length > 0);
             }
             
             drawBoard();
             
-            // Подсветка выбранной шашки и доступных ходов
             const cell = document.querySelector(`.cell[data-row="${row}"][data-col="${col}"]`);
             cell.classList.add('selected');
             
@@ -954,32 +977,30 @@
             });
         }
         
-        // Обработчик клика по клетке
         function handleCellClick(row, col) {
             if (!gameActive || !selectedChecker || botThinking) return;
             
-            // Проверка, является ли клетка допустимым ходом
             const move = availableMoves.find(m => m.row === row && m.col === col);
             if (!move) return;
             
-            // Выполнение хода
             makeMove(selectedChecker.row, selectedChecker.col, row, col, move.captures);
             
-            // Сброс выбора
             selectedChecker = null;
             availableMoves = [];
             
-            // Проверка окончания игры
+            // Для онлайн-игры сохраняем состояние
+            if (gameMode === 'online' && currentGame) {
+                saveOnlineGameState();
+            }
+            
             checkGameEnd();
             
-            // Если игра против бота и сейчас ход бота
             if (gameMode === 'bot' && currentPlayer === 2 && gameActive) {
                 botThinking = true;
                 setTimeout(makeBotMove, 500);
             }
         }
         
-        // Получение доступных ходов для шашки
         function getAvailableMoves(row, col) {
             const checker = boardState[row][col];
             if (!checker) return [];
@@ -987,24 +1008,18 @@
             const moves = [];
             const player = checker.player;
             const isKing = checker.king;
-            const direction = player === 1 ? -1 : 1; // Игрок 1 ходит вверх, игрок 2 - вниз
             
-            // Проверка обычных ходов и взятий
             checkDirection(row, col, player, isKing, moves);
             
             return moves;
         }
         
-        // Проверка ходов в заданном направлении
         function checkDirection(row, col, player, isKing, moves, captures = [], isFirst = true) {
             const directions = [];
             
-            // Определение направлений в зависимости от типа шашки
             if (isKing) {
-                // Дамка ходит во всех направлениях
                 directions.push([-1, -1], [-1, 1], [1, -1], [1, 1]);
             } else {
-                // Обычная шашка ходит только вперед
                 const forward = player === 1 ? -1 : 1;
                 directions.push([forward, -1], [forward, 1]);
             }
@@ -1013,26 +1028,20 @@
                 let newRow = row + dr;
                 let newCol = col + dc;
                 
-                // Проверка на границы доски
                 if (newRow < 0 || newRow >= 8 || newCol < 0 || newCol >= 8) continue;
                 
-                // Если клетка пуста и это первый шаг (не взятие)
                 if (!boardState[newRow][newCol] && captures.length === 0 && isFirst) {
                     moves.push({ row: newRow, col: newCol, captures: [] });
                 }
-                // Если клетка занята шашкой противника
                 else if (boardState[newRow][newCol] && boardState[newRow][newCol].player !== player) {
                     const jumpRow = newRow + dr;
                     const jumpCol = newCol + dc;
                     
-                    // Проверка, можно ли перепрыгнуть через шашку противника
                     if (jumpRow >= 0 && jumpRow < 8 && jumpCol >= 0 && jumpCol < 8 && !boardState[jumpRow][jumpCol]) {
-                        // Проверка, что мы не прыгаем через уже взятую шашку
                         if (!captures.some(c => c.row === newRow && c.col === newCol)) {
                             const newCaptures = [...captures, { row: newRow, col: newCol }];
                             moves.push({ row: jumpRow, col: jumpCol, captures: newCaptures });
                             
-                            // Проверка дополнительных взятий
                             checkDirection(jumpRow, jumpCol, player, isKing, moves, newCaptures, false);
                         }
                     }
@@ -1040,7 +1049,6 @@
             }
         }
         
-        // Получение всех возможных ходов для игрока
         function getAllPossibleMoves(player) {
             const moves = [];
             
@@ -1063,20 +1071,16 @@
             return moves;
         }
         
-        // Выполнение хода
         function makeMove(fromRow, fromCol, toRow, toCol, captures) {
             const checker = boardState[fromRow][fromCol];
             
-            // Перемещение шашки
             boardState[toRow][toCol] = checker;
             boardState[fromRow][fromCol] = null;
             
-            // Удаление взятых шашек
             captures.forEach(capture => {
                 boardState[capture.row][capture.col] = null;
             });
             
-            // Превращение в дамку при достижении противоположного края
             if (!checker.king) {
                 if ((checker.player === 1 && toRow === 0) || (checker.player === 2 && toRow === 7)) {
                     checker.king = true;
@@ -1084,17 +1088,13 @@
                 }
             }
             
-            // Смена игрока, если нет дополнительных взятий
             const additionalMoves = getAvailableMoves(toRow, toCol).filter(move => move.captures.length > 0);
             
-            // Если есть дополнительные взятия этой же шашкой
             if (captures.length > 0 && additionalMoves.length > 0) {
-                // Игрок продолжает ход этой же шашкой
                 selectedChecker = { row: toRow, col: toCol };
                 availableMoves = additionalMoves;
                 drawBoard();
                 
-                // Подсветка выбранной шашки и доступных ходов
                 const cell = document.querySelector(`.cell[data-row="${toRow}"][data-col="${toCol}"]`);
                 cell.classList.add('selected');
                 
@@ -1103,11 +1103,17 @@
                     targetCell.classList.add('available');
                 });
                 
-                return; // Игрок продолжает ход
+                return;
             }
             
             // Смена игрока
             currentPlayer = currentPlayer === 1 ? 2 : 1;
+            
+            // Для онлайн-игры обновляем текущего игрока
+            if (gameMode === 'online' && currentGame) {
+                currentGame.currentPlayer = currentPlayer;
+            }
+            
             selectedChecker = null;
             availableMoves = [];
             
@@ -1115,12 +1121,10 @@
             updateGameStatus();
         }
         
-        // Проверка окончания игры
         function checkGameEnd() {
             const player1Moves = getAllPossibleMoves(1);
             const player2Moves = getAllPossibleMoves(2);
             
-            // Проверка наличия шашек у игроков
             let player1Count = 0;
             let player2Count = 0;
             
@@ -1134,19 +1138,17 @@
                 }
             }
             
-            // Определение победителя
             if (player1Count === 0 || player1Moves.length === 0) {
-                endGame(2); // Победил игрок 2
+                endGame(2);
                 return;
             }
             
             if (player2Count === 0 || player2Moves.length === 0) {
-                endGame(1); // Победил игрок 1
+                endGame(1);
                 return;
             }
         }
         
-        // Завершение игры
         function endGame(winner) {
             gameActive = false;
             
@@ -1166,9 +1168,11 @@
             } else if (gameMode === 'local') {
                 message = `Победил игрок ${winner}!`;
             } else {
-                message = `Победил игрок ${winner === 1 ? document.getElementById('player1-name').textContent : document.getElementById('player2-name').textContent}!`;
+                const winnerName = winner === 1 ? 
+                    document.getElementById('player1-name').textContent : 
+                    document.getElementById('player2-name').textContent;
+                message = `Победил ${winnerName}!`;
                 
-                // Обновление рейтинга для онлайн-игры
                 if (currentGame && currentGame.player1 && currentGame.player2) {
                     updateRatings(winner);
                 }
@@ -1177,15 +1181,18 @@
             showGameMessage(message);
             document.getElementById('game-status').textContent = `Игра завершена. ${message}`;
             
-            // Сохранение истории игры
+            // Для онлайн-игры отмечаем завершение
+            if (gameMode === 'online' && currentGame) {
+                completeOnlineGame(winner);
+            }
+            
             saveGameHistory(winner);
         }
         
-        // Обновление статистики пользователя
         function updateUserStats(result) {
             if (!currentUser) return;
             
-            const users = JSON.parse(localStorage.getItem('users')) || [];
+            const users = JSON.parse(localStorage.getItem(STORAGE_KEYS.USERS)) || [];
             const index = users.findIndex(u => u.id === currentUser.id);
             
             if (index !== -1) {
@@ -1199,11 +1206,10 @@
                     users[index].draws++;
                 }
                 
-                localStorage.setItem('users', JSON.stringify(users));
+                localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(users));
                 currentUser = users[index];
-                localStorage.setItem('currentUser', JSON.stringify(currentUser));
+                localStorage.setItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify(currentUser));
                 
-                // Обновление отображения
                 document.getElementById('currentUserRating').textContent = currentUser.rating;
                 document.getElementById('userWins').textContent = currentUser.wins;
                 document.getElementById('userLosses').textContent = currentUser.losses;
@@ -1211,11 +1217,9 @@
             }
         }
         
-        // Обновление рейтингов для онлайн-игры
         function updateRatings(winner) {
-            // Упрощенная система ELO
             const k = 32;
-            const users = JSON.parse(localStorage.getItem('users')) || [];
+            const users = JSON.parse(localStorage.getItem(STORAGE_KEYS.USERS)) || [];
             
             const player1Index = users.findIndex(u => u.username === currentGame.player1);
             const player2Index = users.findIndex(u => u.username === currentGame.player2);
@@ -1239,16 +1243,14 @@
                     users[player1Index].losses++;
                 }
                 
-                localStorage.setItem('users', JSON.stringify(users));
+                localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(users));
                 
-                // Обновление текущего пользователя, если он участвовал
                 if (currentUser && (currentUser.username === currentGame.player1 || currentUser.username === currentGame.player2)) {
                     const updatedUser = users.find(u => u.id === currentUser.id);
                     if (updatedUser) {
                         currentUser = updatedUser;
-                        localStorage.setItem('currentUser', JSON.stringify(currentUser));
+                        localStorage.setItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify(currentUser));
                         
-                        // Обновление отображения
                         document.getElementById('currentUserRating').textContent = currentUser.rating;
                         document.getElementById('userWins').textContent = currentUser.wins;
                         document.getElementById('userLosses').textContent = currentUser.losses;
@@ -1257,9 +1259,8 @@
             }
         }
         
-        // Сохранение истории игры
         function saveGameHistory(winner) {
-            const history = JSON.parse(localStorage.getItem('gameHistory')) || [];
+            const history = JSON.parse(localStorage.getItem(STORAGE_KEYS.GAME_HISTORY)) || [];
             
             const gameRecord = {
                 id: Date.now(),
@@ -1273,35 +1274,30 @@
             };
             
             history.unshift(gameRecord);
-            if (history.length > 50) history.pop(); // Ограничение истории
-            localStorage.setItem('gameHistory', JSON.stringify(history));
+            if (history.length > 50) history.pop();
+            localStorage.setItem(STORAGE_KEYS.GAME_HISTORY, JSON.stringify(history));
         }
         
         // ==================== БОТ ====================
         
-        // Ход бота
         function makeBotMove() {
             if (!gameActive || currentPlayer !== 2 || botThinking === false) return;
             
             const difficulty = document.getElementById('botDifficulty').value;
             let move;
             
-            // Выбор алгоритма в зависимости от сложности
             if (difficulty === 'easy') {
                 move = getRandomBotMove();
             } else if (difficulty === 'medium') {
                 move = getMinimaxBotMove(2);
-            } else { // hard
+            } else {
                 move = getMinimaxBotMove(4);
             }
             
             if (move) {
-                // Имитация размышлений бота
                 setTimeout(() => {
                     makeMove(move.from.row, move.from.col, move.to.row, move.to.col, move.captures);
                     botThinking = false;
-                    
-                    // Проверка окончания игры
                     checkGameEnd();
                 }, 500);
             } else {
@@ -1309,12 +1305,10 @@
             }
         }
         
-        // Случайный ход бота (легкий уровень)
         function getRandomBotMove() {
             const moves = getAllPossibleMoves(2);
             if (moves.length === 0) return null;
             
-            // Приоритет взятиям
             const captureMoves = moves.filter(m => m.captures.length > 0);
             if (captureMoves.length > 0) {
                 return captureMoves[Math.floor(Math.random() * captureMoves.length)];
@@ -1323,7 +1317,6 @@
             return moves[Math.floor(Math.random() * moves.length)];
         }
         
-        // Минимакс алгоритм для бота
         function getMinimaxBotMove(depth) {
             const moves = getAllPossibleMoves(2);
             if (moves.length === 0) return null;
@@ -1331,19 +1324,15 @@
             let bestMove = null;
             let bestValue = -Infinity;
             
-            // Приоритет взятиям
             const captureMoves = moves.filter(m => m.captures.length > 0);
             const movesToCheck = captureMoves.length > 0 ? captureMoves : moves;
             
             for (const move of movesToCheck) {
-                // Сохраняем текущее состояние доски
                 const boardCopy = JSON.parse(JSON.stringify(boardState));
                 
-                // Делаем ход
                 makeMove(move.from.row, move.from.col, move.to.row, move.to.col, move.captures);
                 const moveValue = minimax(depth - 1, -Infinity, Infinity, false);
                 
-                // Восстанавливаем доску
                 boardState = boardCopy;
                 
                 if (moveValue > bestValue) {
@@ -1355,7 +1344,6 @@
             return bestMove || getRandomBotMove();
         }
         
-        // Минимакс с альфа-бета отсечением
         function minimax(depth, alpha, beta, isMaximizing) {
             if (depth === 0) {
                 return evaluateBoard();
@@ -1365,7 +1353,7 @@
             const moves = getAllPossibleMoves(player);
             
             if (moves.length === 0) {
-                return isMaximizing ? -1000 : 1000; // Шах или мат
+                return isMaximizing ? -1000 : 1000;
             }
             
             if (isMaximizing) {
@@ -1380,7 +1368,7 @@
                     boardState = boardCopy;
                     
                     alpha = Math.max(alpha, evalResult);
-                    if (beta <= alpha) break; // Альфа-бета отсечение
+                    if (beta <= alpha) break;
                 }
                 return maxEval;
             } else {
@@ -1395,13 +1383,12 @@
                     boardState = boardCopy;
                     
                     beta = Math.min(beta, evalResult);
-                    if (beta <= alpha) break; // Альфа-бета отсечение
+                    if (beta <= alpha) break;
                 }
                 return minEval;
             }
         }
         
-        // Оценка позиции на доске
         function evaluateBoard() {
             let score = 0;
             
@@ -1416,12 +1403,10 @@
                             score -= value;
                         }
                         
-                        // Бонус за центральные позиции
                         if (row >= 3 && row <= 4 && col >= 3 && col <= 4) {
                             score += checker.player === 2 ? 0.1 : -0.1;
                         }
                         
-                        // Бонус за защищенность (шашка рядом с краем)
                         if (col === 0 || col === 7) {
                             score += checker.player === 2 ? 0.05 : -0.05;
                         }
@@ -1432,29 +1417,30 @@
             return score;
         }
         
-        // ==================== ИГРОВЫЕ РЕЖИМЫ ====================
+        // ==================== ОНЛАЙН-РЕЖИМ ====================
         
-        // Установка режима игры
         function setGameMode(mode) {
             gameMode = mode;
             
-            // Обновление активной кнопки
             document.querySelectorAll('.mode-btn').forEach(btn => btn.classList.remove('active'));
             event.target.classList.add('active');
             
-            // Показать/скрыть элементы управления ботом
             document.getElementById('bot-controls').style.display = mode === 'bot' ? 'block' : 'none';
+            document.getElementById('online-game-panel').style.display = mode === 'online' ? 'block' : 'none';
             
-            // Обновление списка пользователей для онлайн-режима
             if (mode === 'online') {
                 updateUsersList();
+                checkActiveOnlineGames();
+            } else {
+                // Выход из онлайн-игры при смене режима
+                if (currentGame && currentGame.mode === 'online') {
+                    leaveOnlineGame();
+                }
             }
             
-            // Начало новой игры в выбранном режиме
             startNewGame();
         }
         
-        // Начало новой игры
         function startNewGame() {
             gameActive = true;
             currentPlayer = 1;
@@ -1462,17 +1448,14 @@
             availableMoves = [];
             botThinking = false;
             
-            // Сброс доски
             resetBoard();
             
-            // Настройка игры в зависимости от режима
             if (gameMode === 'bot') {
                 document.getElementById('player1-name').textContent = currentUser ? currentUser.username : 'Игрок';
                 document.getElementById('player1-rating').textContent = currentUser ? `Рейтинг: ${currentUser.rating}` : 'Рейтинг: 0';
                 document.getElementById('player2-name').textContent = 'Бот';
                 document.getElementById('player2-rating').textContent = 'Уровень: ' + document.getElementById('botDifficulty').value;
                 
-                // Игрок всегда ходит первым против бота
                 currentPlayer = 1;
             } 
             else if (gameMode === 'local') {
@@ -1482,265 +1465,413 @@
                 document.getElementById('player2-rating').textContent = 'Локальная игра';
             }
             else if (gameMode === 'online') {
-                document.getElementById('player1-name').textContent = currentUser ? currentUser.username : 'Игрок';
-                document.getElementById('player1-rating').textContent = currentUser ? `Рейтинг: ${currentUser.rating}` : 'Рейтинг: 0';
-                document.getElementById('player2-name').textContent = 'Ожидание соперника...';
-                document.getElementById('player2-rating').textContent = 'Рейтинг: ?';
-                
-                // Создание приглашения или ожидание игры
-                createOnlineGame();
+                setupOnlineGame();
             }
             
             updateGameStatus();
             showGameMessage('Новая игра началась!');
         }
         
-        // Создание онлайн-игры
-        function createOnlineGame() {
+        function setupOnlineGame() {
             if (!currentUser) return;
             
-            // Получение активных игр из LocalStorage
-            const games = JSON.parse(localStorage.getItem('games')) || [];
+            document.getElementById('player1-name').textContent = currentUser.username;
+            document.getElementById('player1-rating').textContent = `Рейтинг: ${currentUser.rating}`;
+            document.getElementById('player2-name').textContent = 'Ожидание соперника...';
+            document.getElementById('player2-rating').textContent = 'Рейтинг: ?';
             
-            // Поиск ожидающих игр
-            const waitingGame = games.find(g => g.status === 'waiting' && g.player1 !== currentUser.username);
-            
-            if (waitingGame) {
-                // Присоединение к существующей игре
-                waitingGame.player2 = currentUser.username;
-                waitingGame.status = 'active';
-                waitingGame.currentPlayer = 1;
-                currentGame = waitingGame;
-                
-                // Обновление отображения
-                document.getElementById('player2-name').textContent = waitingGame.player1;
-                
-                // Загрузка рейтинга соперника
-                const users = JSON.parse(localStorage.getItem('users')) || [];
-                const opponent = users.find(u => u.username === waitingGame.player1);
-                if (opponent) {
-                    document.getElementById('player2-rating').textContent = `Рейтинг: ${opponent.rating}`;
-                }
-                
-                showGameMessage(`Вы присоединились к игре с ${waitingGame.player1}`);
-            } else {
-                // Создание новой игры
-                currentGame = {
-                    id: Date.now(),
-                    player1: currentUser.username,
-                    player2: null,
-                    status: 'waiting',
-                    boardState: boardState,
-                    currentPlayer: 1,
-                    lastUpdate: Date.now()
-                };
-                
-                games.push(currentGame);
-                showGameMessage('Ожидание соперника...');
-            }
-            
-            localStorage.setItem('games', JSON.stringify(games));
-        }
-        
-        // Проверка приглашений в игре
-        function checkGameInvites() {
-            if (gameMode !== 'online' || !currentUser) return;
-            
-            const games = JSON.parse(localStorage.getItem('games')) || [];
-            
-            // Проверка, есть ли обновления в текущей игре
-            if (currentGame) {
-                const updatedGame = games.find(g => g.id === currentGame.id);
-                if (updatedGame && updatedGame.lastUpdate > currentGame.lastUpdate) {
-                    // Обновление игры
-                    currentGame = updatedGame;
-                    
-                    // Обновление доски, если игра активна
-                    if (currentGame.status === 'active' && currentGame.boardState) {
-                        boardState = currentGame.boardState;
-                        currentPlayer = currentGame.currentPlayer;
-                        drawBoard();
-                        updateGameStatus();
-                        
-                        // Проверка окончания игры
-                        checkGameEnd();
-                    }
-                }
-            }
-            
-            // Проверка приглашений
-            const invite = games.find(g => 
-                g.player2 === currentUser.username && 
-                g.status === 'invited' &&
-                (!currentGame || g.id !== currentGame.id)
-            );
-            
-            if (invite) {
-                if (confirm(`${invite.player1} приглашает вас в игру. Принять?`)) {
-                    // Принятие приглашения
-                    invite.status = 'active';
-                    invite.currentPlayer = 1;
-                    currentGame = invite;
-                    
-                    // Обновление отображения
-                    document.getElementById('player1-name').textContent = invite.player2;
-                    document.getElementById('player2-name').textContent = invite.player1;
-                    
-                    // Загрузка рейтинга соперника
-                    const users = JSON.parse(localStorage.getItem('users')) || [];
-                    const opponent = users.find(u => u.username === invite.player1);
-                    if (opponent) {
-                        document.getElementById('player2-rating').textContent = `Рейтинг: ${opponent.rating}`;
-                    }
-                    
-                    // Обновление в хранилище
-                    localStorage.setItem('games', JSON.stringify(games));
-                    
-                    showGameMessage(`Вы приняли приглашение от ${invite.player1}`);
-                    startNewGame();
-                } else {
-                    // Отклонение приглашения
-                    invite.status = 'rejected';
-                    localStorage.setItem('games', JSON.stringify(games));
-                }
-            }
-        }
-        
-        // ==================== ПОЛЬЗОВАТЕЛИ И ЧАТ ====================
-        
-        // Обновление списка пользователей
-        function updateUsersList() {
-            if (!currentUser) return;
-            
-            const usersList = document.getElementById('users-list');
-            usersList.innerHTML = '';
-            
-            // Получение пользователей из LocalStorage
-            const users = JSON.parse(localStorage.getItem('users')) || [];
-            
-            // Фильтрация и сортировка по рейтингу
-            const onlineUsers = users
-                .filter(u => u.id !== currentUser.id && (Date.now() - u.lastOnline) < 30000) // Онлайн за последние 30 секунд
-                .sort((a, b) => b.rating - a.rating);
-            
-            // Добавление текущего пользователя в начало
-            const currentUserElement = document.createElement('div');
-            currentUserElement.className = 'user-item current-user';
-            currentUserElement.innerHTML = `
-                <div class="user-info">
-                    <div class="user-name">${currentUser.username} (Вы)</div>
-                    <div class="user-rating">Рейтинг: ${currentUser.rating}</div>
-                </div>
-                <div class="user-status">● Онлайн</div>
-            `;
-            usersList.appendChild(currentUserElement);
-            
-            // Добавление других пользователей
-            onlineUsers.forEach(user => {
-                const userElement = document.createElement('div');
-                userElement.className = 'user-item online';
-                userElement.innerHTML = `
-                    <div class="user-info">
-                        <div class="user-name">${user.username}</div>
-                        <div class="user-rating">Рейтинг: ${user.rating}</div>
-                    </div>
-                    <button class="invite-btn" onclick="inviteUser('${user.username}')">Пригласить</button>
-                `;
-                usersList.appendChild(userElement);
-            });
-            
-            // Обновление времени последней активности текущего пользователя
-            currentUser.lastOnline = Date.now();
-            const usersUpdated = JSON.parse(localStorage.getItem('users')) || [];
-            const index = usersUpdated.findIndex(u => u.id === currentUser.id);
-            if (index !== -1) {
-                usersUpdated[index].lastOnline = currentUser.lastOnline;
-                localStorage.setItem('users', JSON.stringify(usersUpdated));
-            }
-        }
-        
-        // Обновление онлайн-статуса
-        function updateOnlineStatus() {
-            if (!currentUser) return;
-            
-            // Обновление времени последней активности
-            currentUser.lastOnline = Date.now();
-            const users = JSON.parse(localStorage.getItem('users')) || [];
-            const index = users.findIndex(u => u.id === currentUser.id);
-            if (index !== -1) {
-                users[index].lastOnline = currentUser.lastOnline;
-                localStorage.setItem('users', JSON.stringify(users));
-            }
-            
-            // Обновление списка пользователей в онлайн-режиме
-            if (gameMode === 'online') {
-                updateUsersList();
-            }
-            
-            // Обновление онлайн-игры, если она активна
-            if (gameMode === 'online' && currentGame && gameActive) {
-                const games = JSON.parse(localStorage.getItem('games')) || [];
-                const gameIndex = games.findIndex(g => g.id === currentGame.id);
-                
-                if (gameIndex !== -1) {
-                    // Обновление состояния игры
-                    games[gameIndex].boardState = boardState;
-                    games[gameIndex].currentPlayer = currentPlayer;
-                    games[gameIndex].lastUpdate = Date.now();
-                    
-                    localStorage.setItem('games', JSON.stringify(games));
-                    currentGame = games[gameIndex];
-                }
-            }
-        }
-        
-        // Приглашение пользователя в игру
-        function inviteUser(username) {
-            if (gameMode !== 'online') {
-                showGameMessage('Переключитесь в онлайн-режим для приглашения игроков');
-                return;
-            }
-            
-            const games = JSON.parse(localStorage.getItem('games')) || [];
-            
-            // Проверка, есть ли уже активная игра
+            // Проверяем, есть ли уже активная игра
+            const games = JSON.parse(localStorage.getItem(STORAGE_KEYS.GAMES)) || [];
             const activeGame = games.find(g => 
                 (g.player1 === currentUser.username || g.player2 === currentUser.username) &&
                 g.status === 'active'
             );
             
             if (activeGame) {
+                // Продолжаем существующую игру
+                joinExistingOnlineGame(activeGame);
+            } else {
+                // Создаем новую игру или присоединяемся к ожидающей
+                createOrJoinOnlineGame();
+            }
+        }
+        
+        function createOrJoinOnlineGame() {
+            const games = JSON.parse(localStorage.getItem(STORAGE_KEYS.GAMES)) || [];
+            
+            // Ищем игру, ожидающую второго игрока
+            const waitingGame = games.find(g => 
+                g.status === 'waiting' && 
+                g.player1 !== currentUser.username &&
+                g.player2 === null
+            );
+            
+            if (waitingGame) {
+                // Присоединяемся к игре
+                joinExistingOnlineGame(waitingGame, true);
+            } else {
+                // Создаем новую игру
+                createNewOnlineGame();
+            }
+        }
+        
+        function createNewOnlineGame() {
+            const games = JSON.parse(localStorage.getItem(STORAGE_KEYS.GAMES)) || [];
+            
+            currentGame = {
+                id: 'game_' + Date.now(),
+                player1: currentUser.username,
+                player2: null,
+                boardState: boardState,
+                currentPlayer: 1,
+                status: 'waiting',
+                created: Date.now(),
+                lastUpdate: Date.now(),
+                mode: 'online'
+            };
+            
+            games.push(currentGame);
+            localStorage.setItem(STORAGE_KEYS.GAMES, JSON.stringify(games));
+            
+            updateOnlineGameInfo();
+            showGameMessage('Создана новая игра. Ожидание соперника...');
+        }
+        
+        function joinExistingOnlineGame(game, isJoining = false) {
+            if (isJoining) {
+                game.player2 = currentUser.username;
+                game.status = 'active';
+                game.lastUpdate = Date.now();
+                
+                // Обновляем в хранилище
+                const games = JSON.parse(localStorage.getItem(STORAGE_KEYS.GAMES)) || [];
+                const index = games.findIndex(g => g.id === game.id);
+                if (index !== -1) {
+                    games[index] = game;
+                    localStorage.setItem(STORAGE_KEYS.GAMES, JSON.stringify(games));
+                }
+                
+                showGameMessage(`Вы присоединились к игре с ${game.player1}`);
+            }
+            
+            currentGame = game;
+            
+            // Загружаем состояние доски
+            if (game.boardState) {
+                boardState = game.boardState;
+                drawBoard();
+            }
+            
+            // Определяем, за кого мы играем
+            const isPlayer1 = currentUser.username === game.player1;
+            currentPlayer = game.currentPlayer;
+            
+            // Обновляем отображение
+            document.getElementById('player1-name').textContent = game.player1;
+            document.getElementById('player2-name').textContent = game.player2 || 'Ожидание...';
+            
+            // Загружаем рейтинги
+            updatePlayerRatings(game.player1, game.player2);
+            
+            updateGameStatus();
+            updateOnlineGameInfo();
+            
+            gameActive = game.status === 'active';
+        }
+        
+        function updatePlayerRatings(player1Name, player2Name) {
+            const users = JSON.parse(localStorage.getItem(STORAGE_KEYS.USERS)) || [];
+            
+            const player1 = users.find(u => u.username === player1Name);
+            if (player1) {
+                document.getElementById('player1-rating').textContent = `Рейтинг: ${player1.rating}`;
+            }
+            
+            if (player2Name) {
+                const player2 = users.find(u => u.username === player2Name);
+                if (player2) {
+                    document.getElementById('player2-rating').textContent = `Рейтинг: ${player2.rating}`;
+                }
+            }
+        }
+        
+        function saveOnlineGameState() {
+            if (!currentGame || gameMode !== 'online') return;
+            
+            const games = JSON.parse(localStorage.getItem(STORAGE_KEYS.GAMES)) || [];
+            const index = games.findIndex(g => g.id === currentGame.id);
+            
+            if (index !== -1) {
+                games[index].boardState = boardState;
+                games[index].currentPlayer = currentPlayer;
+                games[index].lastUpdate = Date.now();
+                games[index].status = 'active';
+                
+                localStorage.setItem(STORAGE_KEYS.GAMES, JSON.stringify(games));
+                currentGame = games[index];
+                
+                lastGameUpdate = Date.now();
+            }
+        }
+        
+        function checkForOnlineUpdates() {
+            if (gameMode !== 'online' || !currentGame) return;
+            
+            const games = JSON.parse(localStorage.getItem(STORAGE_KEYS.GAMES)) || [];
+            const game = games.find(g => g.id === currentGame.id);
+            
+            if (!game) {
+                showGameMessage('Игра не найдена');
+                return;
+            }
+            
+            if (game.lastUpdate > lastGameUpdate) {
+                // Обновление получено
+                boardState = game.boardState;
+                currentPlayer = game.currentPlayer;
+                currentGame = game;
+                
+                drawBoard();
+                updateGameStatus();
+                updateOnlineGameInfo();
+                
+                lastGameUpdate = Date.now();
+                
+                // Проверяем окончание игры
+                checkGameEnd();
+                
+                showGameMessage('Состояние игры обновлено');
+            } else {
+                showGameMessage('Новых обновлений нет');
+            }
+        }
+        
+        function completeOnlineGame(winner) {
+            if (!currentGame) return;
+            
+            const games = JSON.parse(localStorage.getItem(STORAGE_KEYS.GAMES)) || [];
+            const index = games.findIndex(g => g.id === currentGame.id);
+            
+            if (index !== -1) {
+                games[index].status = 'completed';
+                games[index].winner = winner;
+                games[index].lastUpdate = Date.now();
+                
+                localStorage.setItem(STORAGE_KEYS.GAMES, JSON.stringify(games));
+            }
+        }
+        
+        function leaveOnlineGame() {
+            if (!currentGame) return;
+            
+            const games = JSON.parse(localStorage.getItem(STORAGE_KEYS.GAMES)) || [];
+            const index = games.findIndex(g => g.id === currentGame.id);
+            
+            if (index !== -1) {
+                if (games[index].status === 'active') {
+                    // Если игра активна, отмечаем сдачу
+                    const winner = currentUser.username === currentGame.player1 ? 2 : 1;
+                    games[index].status = 'surrendered';
+                    games[index].winner = winner;
+                    games[index].lastUpdate = Date.now();
+                    
+                    showGameMessage('Вы покинули игру. Засчитано поражение.');
+                } else if (games[index].status === 'waiting') {
+                    // Если игра ожидала игрока, удаляем ее
+                    games.splice(index, 1);
+                }
+                
+                localStorage.setItem(STORAGE_KEYS.GAMES, JSON.stringify(games));
+            }
+            
+            currentGame = null;
+            document.getElementById('online-game-panel').style.display = 'none';
+            
+            // Возвращаемся к режиму бота
+            setGameMode('bot');
+        }
+        
+        function updateOnlineGameInfo() {
+            if (!currentGame || gameMode !== 'online') {
+                document.getElementById('online-game-panel').style.display = 'none';
+                return;
+            }
+            
+            document.getElementById('online-game-panel').style.display = 'block';
+            
+            const isPlayer1 = currentUser.username === currentGame.player1;
+            const opponent = isPlayer1 ? currentGame.player2 : currentGame.player1;
+            const status = currentGame.status === 'waiting' ? 'Ожидание соперника' : 
+                          currentGame.status === 'active' ? 'Игра идет' : 
+                          'Завершена';
+            
+            const info = `
+                <p><strong>Оппонент:</strong> ${opponent || 'ожидание'}</p>
+                <p><strong>Статус:</strong> ${status}</p>
+                <p><strong>Ваша сторона:</strong> ${isPlayer1 ? 'Белые (ходят первыми)' : 'Черные'}</p>
+                <p><strong>Текущий ход:</strong> ${currentGame.currentPlayer === 1 ? 'Белые' : 'Черные'}</p>
+                <p><small>Последнее обновление: ${new Date(currentGame.lastUpdate).toLocaleTimeString()}</small></p>
+            `;
+            
+            document.getElementById('online-game-info').innerHTML = info;
+        }
+        
+        function checkActiveOnlineGames() {
+            if (!currentUser || gameMode !== 'online') return;
+            
+            const games = JSON.parse(localStorage.getItem(STORAGE_KEYS.GAMES)) || [];
+            
+            // Проверяем, есть ли активные игры для текущего пользователя
+            const activeGame = games.find(g => 
+                (g.player1 === currentUser.username || g.player2 === currentUser.username) &&
+                g.status === 'active'
+            );
+            
+            if (activeGame && (!currentGame || currentGame.id !== activeGame.id)) {
+                if (confirm('У вас есть активная онлайн-игра. Продолжить?')) {
+                    joinExistingOnlineGame(activeGame);
+                }
+            }
+        }
+        
+        // ==================== ПОЛЬЗОВАТЕЛИ И ЧАТ ====================
+        
+        function updateUsersList() {
+            if (!currentUser) return;
+            
+            const usersList = document.getElementById('users-list');
+            usersList.innerHTML = '';
+            
+            const users = JSON.parse(localStorage.getItem(STORAGE_KEYS.USERS)) || [];
+            
+            // Фильтруем и сортируем пользователей
+            const onlineUsers = users
+                .filter(u => u.id !== currentUser.id)
+                .sort((a, b) => {
+                    // Сначала онлайн, потом оффлайн
+                    if (a.status === 'online' && b.status !== 'online') return -1;
+                    if (a.status !== 'online' && b.status === 'online') return 1;
+                    // Потом по рейтингу
+                    return b.rating - a.rating;
+                });
+            
+            // Добавляем текущего пользователя
+            const currentUserElement = document.createElement('div');
+            currentUserElement.className = 'user-item current-user';
+            currentUserElement.innerHTML = `
+                <div class="user-info">
+                    <span class="online-indicator online"></span>
+                    <div class="user-name">${currentUser.username} (Вы)</div>
+                    <div class="user-rating">Рейтинг: ${currentUser.rating}</div>
+                </div>
+                <div class="user-status">Вы</div>
+            `;
+            usersList.appendChild(currentUserElement);
+            
+            // Добавляем остальных пользователей
+            onlineUsers.forEach(user => {
+                const isOnline = user.status === 'online' && (Date.now() - user.lastOnline) < 30000;
+                const canInvite = isOnline && gameMode === 'online' && 
+                                 (!currentGame || currentGame.status !== 'active');
+                
+                const userElement = document.createElement('div');
+                userElement.className = `user-item ${isOnline ? 'online' : ''}`;
+                userElement.innerHTML = `
+                    <div class="user-info">
+                        <span class="online-indicator ${isOnline ? 'online' : 'offline'}"></span>
+                        <div class="user-name">${user.username}</div>
+                        <div class="user-rating">Рейтинг: ${user.rating}</div>
+                    </div>
+                    ${canInvite ? `<button class="invite-btn" onclick="inviteUser('${user.username}')">Пригласить</button>` : 
+                     isOnline ? '<span style="color: #2ecc71; font-size: 0.8rem;">● Онлайн</span>' : 
+                     '<span style="color: #e74c3c; font-size: 0.8rem;">● Оффлайн</span>'}
+                `;
+                usersList.appendChild(userElement);
+            });
+            
+            // Обновляем счетчик онлайн
+            const onlineCount = users.filter(u => u.status === 'online' && (Date.now() - u.lastOnline) < 30000).length;
+            document.getElementById('online-count').textContent = `(${onlineCount})`;
+        }
+        
+        function updateOnlineStatus() {
+            if (!currentUser) return;
+            
+            // Обновляем статус текущего пользователя
+            currentUser.lastOnline = Date.now();
+            currentUser.status = 'online';
+            
+            const users = JSON.parse(localStorage.getItem(STORAGE_KEYS.USERS)) || [];
+            const index = users.findIndex(u => u.id === currentUser.id);
+            if (index !== -1) {
+                users[index] = currentUser;
+                localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(users));
+            }
+            
+            // Для онлайн-игры проверяем обновления
+            if (gameMode === 'online' && currentGame) {
+                checkForOnlineUpdates();
+            }
+            
+            // Обновляем список пользователей
+            updateUsersList();
+        }
+        
+        function inviteUser(username) {
+            if (gameMode !== 'online') {
+                showGameMessage('Переключитесь в онлайн-режим для приглашения игроков');
+                return;
+            }
+            
+            if (currentGame && currentGame.status === 'active') {
                 showGameMessage('У вас уже есть активная игра');
                 return;
             }
             
-            // Создание приглашения
+            const games = JSON.parse(localStorage.getItem(STORAGE_KEYS.GAMES)) || [];
+            
+            // Проверяем, не отправили ли уже приглашение этому пользователю
+            const existingInvite = games.find(g => 
+                g.player1 === currentUser.username && 
+                g.player2 === username && 
+                g.status === 'invited'
+            );
+            
+            if (existingInvite) {
+                showGameMessage(`Вы уже отправили приглашение ${username}`);
+                return;
+            }
+            
+            // Создаем приглашение
             const invite = {
-                id: Date.now(),
+                id: 'invite_' + Date.now(),
                 player1: currentUser.username,
                 player2: username,
                 status: 'invited',
-                boardState: null,
-                currentPlayer: 1,
-                lastUpdate: Date.now()
+                created: Date.now(),
+                lastUpdate: Date.now(),
+                mode: 'online'
             };
             
             games.push(invite);
-            localStorage.setItem('games', JSON.stringify(games));
+            localStorage.setItem(STORAGE_KEYS.GAMES, JSON.stringify(games));
             
             showGameMessage(`Приглашение отправлено ${username}`);
+            
+            // Добавляем сообщение в чат
+            sendSystemMessage(`${currentUser.username} пригласил ${username} в игру`);
         }
         
-        // Загрузка сообщений чата
         function loadChatMessages() {
             const chatMessages = document.getElementById('chat-messages');
-            chatMessages.innerHTML = '';
             
-            // Получение сообщений из LocalStorage
-            const messages = JSON.parse(localStorage.getItem('chatMessages')) || [];
+            // Получаем сообщения из LocalStorage
+            const messages = JSON.parse(localStorage.getItem(STORAGE_KEYS.CHAT)) || [];
             
-            // Ограничение количества отображаемых сообщений
+            // Показываем только последние 50 сообщений
             const recentMessages = messages.slice(-50);
+            
+            chatMessages.innerHTML = '';
             
             recentMessages.forEach(msg => {
                 const messageElement = document.createElement('div');
@@ -1748,63 +1879,81 @@
                 
                 const time = new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
                 
-                messageElement.innerHTML = `
-                    <div>
-                        <span class="sender">${msg.sender}:</span>
-                        <span class="text">${msg.text}</span>
-                        <span class="time">${time}</span>
-                    </div>
-                `;
+                if (msg.type === 'system') {
+                    messageElement.innerHTML = `
+                        <div>
+                            <span style="color: #f1c40f;">[Система] ${msg.text}</span>
+                            <span class="time">${time}</span>
+                        </div>
+                    `;
+                } else {
+                    messageElement.innerHTML = `
+                        <div>
+                            <span class="sender">${msg.sender}:</span>
+                            <span class="text">${msg.text}</span>
+                            <span class="time">${time}</span>
+                        </div>
+                    `;
+                }
                 
                 chatMessages.appendChild(messageElement);
             });
             
-            // Прокрутка вниз
             chatMessages.scrollTop = chatMessages.scrollHeight;
         }
         
-        // Отправка сообщения в чат
         function sendMessage() {
             const messageInput = document.getElementById('message');
             const text = messageInput.value.trim();
             
             if (!text || !currentUser) return;
             
-            // Создание сообщения
             const message = {
                 sender: currentUser.username,
                 text: text,
-                timestamp: Date.now()
+                timestamp: Date.now(),
+                type: 'user'
             };
             
-            // Сохранение в LocalStorage
-            const messages = JSON.parse(localStorage.getItem('chatMessages')) || [];
+            const messages = JSON.parse(localStorage.getItem(STORAGE_KEYS.CHAT)) || [];
             messages.push(message);
             
-            // Ограничение количества сообщений
             if (messages.length > 200) {
                 messages.splice(0, messages.length - 200);
             }
             
-            localStorage.setItem('chatMessages', JSON.stringify(messages));
+            localStorage.setItem(STORAGE_KEYS.CHAT, JSON.stringify(messages));
             
-            // Очистка поля ввода
             messageInput.value = '';
+            loadChatMessages();
+        }
+        
+        function sendSystemMessage(text) {
+            const message = {
+                sender: 'Система',
+                text: text,
+                timestamp: Date.now(),
+                type: 'system'
+            };
             
-            // Обновление чата
+            const messages = JSON.parse(localStorage.getItem(STORAGE_KEYS.CHAT)) || [];
+            messages.push(message);
+            
+            if (messages.length > 200) {
+                messages.splice(0, messages.length - 200);
+            }
+            
+            localStorage.setItem(STORAGE_KEYS.CHAT, JSON.stringify(messages));
             loadChatMessages();
         }
         
         // ==================== ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ====================
         
-        // Обновление информации об игроках
         function updatePlayerInfo() {
-            // Подсветка активного игрока
             document.getElementById('player1-card').classList.toggle('active', currentPlayer === 1);
             document.getElementById('player2-card').classList.toggle('active', currentPlayer === 2);
         }
         
-        // Обновление статуса игры
         function updateGameStatus() {
             let status = '';
             
@@ -1815,20 +1964,22 @@
             } else if (gameMode === 'local') {
                 status = `Ход игрока ${currentPlayer}`;
             } else if (gameMode === 'online') {
-                if (currentGame && currentGame.status === 'waiting') {
-                    status = 'Ожидание соперника...';
+                if (currentGame) {
+                    if (currentGame.status === 'waiting') {
+                        status = 'Ожидание соперника...';
+                    } else {
+                        const isPlayer1 = currentUser.username === currentGame.player1;
+                        const myTurn = (isPlayer1 && currentPlayer === 1) || (!isPlayer1 && currentPlayer === 2);
+                        status = myTurn ? 'Ваш ход!' : 'Ход соперника...';
+                    }
                 } else {
-                    const playerName = currentPlayer === 1 ? 
-                        document.getElementById('player1-name').textContent : 
-                        document.getElementById('player2-name').textContent;
-                    status = `Ход игрока: ${playerName}`;
+                    status = 'Выберите соперника';
                 }
             }
             
             document.getElementById('game-status').textContent = status;
         }
         
-        // Показать игровое сообщение
         function showGameMessage(message) {
             const gameStatus = document.getElementById('game-status');
             const originalText = gameStatus.textContent;
@@ -1842,20 +1993,39 @@
             }, 3000);
         }
         
-        // Сдача в игре
         function surrender() {
             if (!gameActive) return;
             
             if (confirm('Вы уверены, что хотите сдаться?')) {
                 if (gameMode === 'bot') {
-                    endGame(2); // Бот побеждает
+                    endGame(2);
                 } else if (gameMode === 'local') {
-                    endGame(currentPlayer === 1 ? 2 : 1); // Противник побеждает
+                    endGame(currentPlayer === 1 ? 2 : 1);
                 } else if (gameMode === 'online') {
-                    endGame(currentPlayer === 1 ? 2 : 1); // Противник побеждает
+                    if (currentGame) {
+                        const winner = currentUser.username === currentGame.player1 ? 2 : 1;
+                        endGame(winner);
+                    }
                 }
             }
         }
+        
+        // Очистка интервалов при закрытии страницы
+        window.addEventListener('beforeunload', function() {
+            if (onlineCheckInterval) clearInterval(onlineCheckInterval);
+            if (chatCheckInterval) clearInterval(chatCheckInterval);
+            
+            // Обновляем статус пользователя при выходе
+            if (currentUser) {
+                const users = JSON.parse(localStorage.getItem(STORAGE_KEYS.USERS)) || [];
+                const index = users.findIndex(u => u.id === currentUser.id);
+                if (index !== -1) {
+                    users[index].lastOnline = Date.now();
+                    users[index].status = 'offline';
+                    localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(users));
+                }
+            }
+        });
     </script>
 </body>
 </html>
