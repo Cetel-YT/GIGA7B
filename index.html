@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Онлайн шашки</title>
+    <title>Онлайн шашки 4</title>
     
     <!-- Firebase SDK -->
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
@@ -906,14 +906,15 @@
         let moveCount = 1;
         let forcedCaptureChecker = null;
         let chatRef = null;
+        let chatListener = null;
         
         // Новые переменные для режимов
         let gameMode = 'normal'; // 'normal', 'giveaway', 'fog'
         let fogOfWarActive = false;
-        let revealedCells = new Set(); // Для тумана войны
+        let revealedCells = new Set();
         
-        // Администраторы (можно добавить больше админов)
-        const ADMIN_USERS = ['admin', 'administrator', 'супервайзер']; // Имена пользователей-админов
+        // Администраторы
+        const ADMIN_USERS = ['admin', 'administrator', 'супервайзер'];
         
         // ====================================================
         // ИНИЦИАЛИЗАЦИЯ ПРИ ЗАГРУЗКЕ
@@ -1001,7 +1002,6 @@
                 
                 console.log('✅ Пользователь создан:', userId);
                 
-                // Проверяем, является ли пользователь админом
                 const isAdmin = ADMIN_USERS.includes(username.toLowerCase());
                 
                 const userData = {
@@ -1025,9 +1025,7 @@
                 };
                 
                 showGameScreen();
-                startNewGame();
                 showNotification('✅ Регистрация успешна!' + (isAdmin ? ' Вы администратор!' : ''));
-                showAuthMessage('Добро пожаловать, ' + username + (isAdmin ? ' (Админ)' : '') + '!', 'success');
                 
             } catch (error) {
                 console.error('❌ Ошибка регистрации:', error);
@@ -1082,6 +1080,45 @@
                 }
             } catch (error) {
                 console.error('❌ Ошибка загрузки данных пользователя:', error);
+                showAuthMessage('Ошибка загрузки данных пользователя');
+            }
+        }
+        
+        async function logout() {
+            try {
+                // Отписываемся от чата ПЕРВЫМ делом
+                if (chatListener) {
+                    chatRef.off('value', chatListener);
+                    chatListener = null;
+                }
+                
+                // Обновляем статус пользователя
+                if (currentUser && auth.currentUser) {
+                    await database.ref('users/' + currentUser.uid).update({
+                        status: 'offline',
+                        lastOnline: firebase.database.ServerValue.TIMESTAMP
+                    });
+                }
+                
+                // Выходим из Firebase
+                await auth.signOut();
+                
+                // Сбрасываем все переменные
+                currentUser = null;
+                gameActive = false;
+                botThinking = false;
+                selectedChecker = null;
+                boardState = [];
+                
+                // Показываем экран аутентификации
+                showAuthScreen();
+                showNotification('✅ Вы вышли из системы');
+                
+            } catch (error) {
+                console.error('❌ Ошибка выхода:', error);
+                showNotification('❌ Ошибка выхода из системы', 'error');
+                // Принудительно показываем экран аутентификации даже при ошибке
+                showAuthScreen();
             }
         }
         
@@ -1115,7 +1152,7 @@
             
             try {
                 await database.ref('chat/' + messageId).remove();
-                showNotification('✅ Сообщение удалено');
+                console.log('✅ Сообщение удалено:', messageId);
             } catch (error) {
                 console.error('❌ Ошибка удаления сообщения:', error);
                 showNotification('❌ Ошибка удаления сообщения', 'error');
@@ -1133,7 +1170,7 @@
                 const users = snapshot.val();
                 let userList = '👥 Все пользователи:\n\n';
                 
-                Object.keys(users).forEach(uid => {
+                Object.keys(users || {}).forEach(uid => {
                     const user = users[uid];
                     userList += `${user.username} (Рейтинг: ${user.rating})${user.isAdmin ? ' 👑 Админ' : ''}\n`;
                 });
@@ -1188,9 +1225,8 @@
                 for (let col = 0; col < 8; col++) {
                     const cell = document.createElement('div');
                     
-                    // Определяем, скрыта ли клетка в режиме тумана войны
                     let isHidden = false;
-                    if (fogOfWarActive && row < 4) { // Верхняя половина доски (бот)
+                    if (fogOfWarActive && row < 4) {
                         isHidden = true;
                     }
                     
@@ -1208,18 +1244,13 @@
                         handleCellClick(row, col);
                     });
                     
-                    // В режиме тумана войны не показываем шашки бота
-                    if (fogOfWarActive && row < 4 && (boardState[row][col] === 2 || boardState[row][col] === 4)) {
-                        // Не добавляем шашку - она скрыта
-                    } else {
-                        const piece = boardState[row][col];
-                        if (piece !== 0) {
-                            const checker = document.createElement('div');
-                            checker.className = `checker player${piece === 1 || piece === 3 ? '1' : '2'}${piece > 2 ? ' king' : ''}`;
-                            checker.dataset.row = row;
-                            checker.dataset.col = col;
-                            cell.appendChild(checker);
-                        }
+                    const piece = boardState[row][col];
+                    if (piece !== 0) {
+                        const checker = document.createElement('div');
+                        checker.className = `checker player${piece === 1 || piece === 3 ? '1' : '2'}${piece > 2 ? ' king' : ''}`;
+                        checker.dataset.row = row;
+                        checker.dataset.col = col;
+                        cell.appendChild(checker);
                     }
                     
                     board.appendChild(cell);
@@ -1229,92 +1260,9 @@
             updateGameStats();
         }
         
-        // Обновляем функцию для отображения доски с учетом тумана войны
-        function updateBoardUI() {
-            const cells = document.querySelectorAll('.cell');
-            cells.forEach(cell => {
-                const row = parseInt(cell.dataset.row);
-                const col = parseInt(cell.dataset.col);
-                const piece = boardState[row][col];
-                
-                // Удаляем старые шашки
-                const oldChecker = cell.querySelector('.checker');
-                if (oldChecker) {
-                    oldChecker.remove();
-                }
-                
-                // В режиме тумана войны скрываем шашки бота на его половине
-                if (fogOfWarActive && row < 4 && (piece === 2 || piece === 4)) {
-                    // Не показываем шашки бота, если клетка скрыта
-                    if (!revealedCells.has(`${row},${col}`)) {
-                        return;
-                    }
-                }
-                
-                // Показываем шашки
-                if (piece !== 0) {
-                    const checker = document.createElement('div');
-                    checker.className = `checker player${piece === 1 || piece === 3 ? '1' : '2'}${piece > 2 ? ' king' : ''}`;
-                    checker.dataset.row = row;
-                    checker.dataset.col = col;
-                    cell.appendChild(checker);
-                }
-            });
-            
-            // Обновляем раскрытые клетки
-            updateRevealedCells();
-        }
-        
-        // Раскрываем клетки вокруг шашек игрока
-        function updateRevealedCells() {
-            if (!fogOfWarActive) return;
-            
-            const newRevealedCells = new Set();
-            
-            // Находим все шашки игрока
-            for (let row = 0; row < 8; row++) {
-                for (let col = 0; col < 8; col++) {
-                    if (boardState[row][col] === 1 || boardState[row][col] === 3) {
-                        // Раскрываем клетки вокруг шашки (в радиусе 1)
-                        for (let dr = -1; dr <= 1; dr++) {
-                            for (let dc = -1; dc <= 1; dc++) {
-                                const newRow = row + dr;
-                                const newCol = col + dc;
-                                
-                                if (isValidPosition(newRow, newCol) && newRow < 4) {
-                                    newRevealedCells.add(`${newRow},${newCol}`);
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-            
-            revealedCells = newRevealedCells;
-            
-            // Обновляем отображение клеток
-            const cells = document.querySelectorAll('.cell[data-hidden="true"]');
-            cells.forEach(cell => {
-                const row = parseInt(cell.dataset.row);
-                const col = parseInt(cell.dataset.col);
-                
-                if (revealedCells.has(`${row},${col}`)) {
-                    cell.classList.remove('hidden');
-                    cell.classList.add('revealed');
-                    cell.classList.add((row + col) % 2 === 0 ? 'light' : 'dark');
-                    cell.dataset.hidden = 'false';
-                } else {
-                    cell.classList.add('hidden');
-                    cell.classList.remove('revealed', 'light', 'dark');
-                    cell.dataset.hidden = 'true';
-                }
-            });
-        }
-        
         function getInitialBoard() {
             const board = Array(8).fill().map(() => Array(8).fill(0));
             
-            // Расставляем шашки игрока 1 (нижняя часть)
             for (let row = 5; row < 8; row++) {
                 for (let col = 0; col < 8; col++) {
                     if ((row + col) % 2 === 1) {
@@ -1323,7 +1271,6 @@
                 }
             }
             
-            // Расставляем шашки игрока 2 (верхняя часть)
             for (let row = 0; row < 3; row++) {
                 for (let col = 0; col < 8; col++) {
                     if ((row + col) % 2 === 1) {
@@ -1336,50 +1283,29 @@
         }
         
         function handleCellClick(row, col) {
-            console.log('🖱️ Клик по клетке:', row, col, 'Текущий игрок:', currentPlayer, 'Режим:', gameMode);
-            
-            if (!gameActive || botThinking) {
-                console.log('⚠️ Игра не активна или бот думает');
+            if (!gameActive || botThinking || currentPlayer !== 1) {
                 return;
             }
             
-            // В режиме тумана войны нельзя кликать на скрытые клетки
-            if (fogOfWarActive && document.querySelector(`.cell[data-row="${row}"][data-col="${col}"]`)?.dataset.hidden === 'true') {
-                showNotification('⚠️ Эта клетка скрыта туманом войны');
-                return;
-            }
+            const piece = boardState[row][col];
             
-            // Если сейчас ход игрока
-            if (currentPlayer === 1) {
-                const piece = boardState[row][col];
+            if (piece === 1 || piece === 3) {
+                const allCaptures = getAllCapturesForPlayer(1);
                 
-                // Если кликнули на шашку игрока
-                if (piece === 1 || piece === 3) {
-                    // Проверяем, есть ли обязательное взятие для всего поля
-                    const allCaptures = getAllCapturesForPlayer(1);
-                    
-                    if (allCaptures.length > 0) {
-                        // Проверяем, может ли эта конкретная шашка бить
-                        const capturesForChecker = getCapturesForChecker(row, col);
-                        if (capturesForChecker.length > 0) {
-                            console.log('✅ Выбрана шашка игрока с обязательным взятием');
-                            selectChecker(row, col);
-                        } else {
-                            console.log('⚠️ Эта шашка не может бить, но другие могут');
-                            showNotification('⚠️ Вы должны бить другой шашкой!');
-                            highlightForcedCaptures();
-                        }
-                    } else {
-                        // Нет обязательных взятий - выбираем шашку
-                        console.log('✅ Выбрана шашка игрока');
+                if (allCaptures.length > 0) {
+                    const capturesForChecker = getCapturesForChecker(row, col);
+                    if (capturesForChecker.length > 0) {
                         selectChecker(row, col);
+                    } else {
+                        showNotification('⚠️ Вы должны бить другой шашкой!');
+                        highlightForcedCaptures();
                     }
+                } else {
+                    selectChecker(row, col);
                 }
-                // Если кликнули на доступную клетку и есть выбранная шашка
-                else if (selectedChecker && isAvailableMove(row, col)) {
-                    console.log('✅ Ход на клетку:', row, col);
-                    makeMove(row, col);
-                }
+            }
+            else if (selectedChecker && isAvailableMove(row, col)) {
+                makeMove(row, col);
             }
         }
         
@@ -1398,6 +1324,387 @@
             });
         }
         
+        function selectChecker(row, col) {
+            clearSelection();
+            
+            selectedChecker = { row, col };
+            availableMoves = getAvailableMoves(row, col);
+            
+            const cell = document.querySelector(`.cell[data-row="${row}"][data-col="${col}"]`);
+            if (cell) {
+                cell.classList.add('selected');
+            }
+            
+            availableMoves.forEach(move => {
+                const targetCell = document.querySelector(`.cell[data-row="${move.row}"][data-col="${move.col}"]`);
+                if (targetCell) {
+                    targetCell.classList.add('available');
+                    if (move.isCapture) {
+                        targetCell.classList.add('capture');
+                    }
+                }
+            });
+            
+            document.querySelectorAll('.cell.must-capture').forEach(cell => {
+                cell.classList.remove('must-capture');
+            });
+        }
+        
+        function clearSelection() {
+            document.querySelectorAll('.cell.selected').forEach(cell => {
+                cell.classList.remove('selected');
+            });
+            
+            document.querySelectorAll('.cell.available').forEach(cell => {
+                cell.classList.remove('available', 'capture');
+            });
+            
+            document.querySelectorAll('.cell.must-capture').forEach(cell => {
+                cell.classList.remove('must-capture');
+            });
+            
+            selectedChecker = null;
+            availableMoves = [];
+        }
+        
+        function getAvailableMoves(row, col) {
+            const piece = boardState[row][col];
+            const moves = [];
+            
+            if (piece === 0) return moves;
+            
+            const isKing = piece > 2;
+            const player = piece === 1 || piece === 3 ? 1 : 2;
+            
+            const allCaptures = getAllCapturesForPlayer(player);
+            
+            if (allCaptures.length > 0) {
+                return getCapturesForChecker(row, col);
+            }
+            
+            if (isKing) {
+                const directions = [
+                    { dr: -1, dc: -1 },
+                    { dr: -1, dc: 1 },
+                    { dr: 1, dc: -1 },
+                    { dr: 1, dc: 1 }
+                ];
+                
+                for (const dir of directions) {
+                    let newRow = row + dir.dr;
+                    let newCol = col + dir.dc;
+                    
+                    while (isValidPosition(newRow, newCol) && boardState[newRow][newCol] === 0) {
+                        moves.push({ 
+                            row: newRow, 
+                            col: newCol, 
+                            isCapture: false,
+                            direction: dir
+                        });
+                        newRow += dir.dr;
+                        newCol += dir.dc;
+                    }
+                }
+            } else {
+                const directions = [];
+                if (player === 1) {
+                    directions.push({ dr: -1, dc: -1 });
+                    directions.push({ dr: -1, dc: 1 });
+                } else {
+                    directions.push({ dr: 1, dc: -1 });
+                    directions.push({ dr: 1, dc: 1 });
+                }
+                
+                for (const dir of directions) {
+                    const newRow = row + dir.dr;
+                    const newCol = col + dir.dc;
+                    
+                    if (isValidPosition(newRow, newCol) && boardState[newRow][newCol] === 0) {
+                        moves.push({ 
+                            row: newRow, 
+                            col: newCol, 
+                            isCapture: false,
+                            direction: dir
+                        });
+                    }
+                }
+            }
+            
+            return moves;
+        }
+        
+        function getAllCapturesForPlayer(player) {
+            const captures = [];
+            
+            for (let row = 0; row < 8; row++) {
+                for (let col = 0; col < 8; col++) {
+                    const piece = boardState[row][col];
+                    if ((player === 1 && (piece === 1 || piece === 3)) || 
+                        (player === 2 && (piece === 2 || piece === 4))) {
+                        const checkerCaptures = getCapturesForChecker(row, col);
+                        if (checkerCaptures.length > 0) {
+                            captures.push({
+                                from: { row, col },
+                                captures: checkerCaptures
+                            });
+                        }
+                    }
+                }
+            }
+            
+            return captures;
+        }
+        
+        function getCapturesForChecker(row, col) {
+            const piece = boardState[row][col];
+            const captures = [];
+            
+            if (piece === 0) return captures;
+            
+            const isKing = piece > 2;
+            const player = piece === 1 || piece === 3 ? 1 : 2;
+            const enemyPieces = player === 1 ? [2, 4] : [1, 3];
+            
+            if (isKing) {
+                const directions = [
+                    { dr: -1, dc: -1 },
+                    { dr: -1, dc: 1 },
+                    { dr: 1, dc: -1 },
+                    { dr: 1, dc: 1 }
+                ];
+                
+                for (const dir of directions) {
+                    let currentRow = row + dir.dr;
+                    let currentCol = col + dir.dc;
+                    let foundEnemy = false;
+                    let enemyRow = -1;
+                    let enemyCol = -1;
+                    
+                    while (isValidPosition(currentRow, currentCol)) {
+                        if (boardState[currentRow][currentCol] === 0) {
+                            if (foundEnemy) {
+                                captures.push({
+                                    row: currentRow,
+                                    col: currentCol,
+                                    isCapture: true,
+                                    captureRow: enemyRow,
+                                    captureCol: enemyCol,
+                                    isKingCapture: true,
+                                    direction: dir
+                                });
+                            }
+                        } else if (enemyPieces.includes(boardState[currentRow][currentCol])) {
+                            if (!foundEnemy) {
+                                foundEnemy = true;
+                                enemyRow = currentRow;
+                                enemyCol = currentCol;
+                            } else {
+                                break;
+                            }
+                        } else {
+                            break;
+                        }
+                        currentRow += dir.dr;
+                        currentCol += dir.dc;
+                    }
+                }
+            } else {
+                const directions = [
+                    { dr: -1, dc: -1 },
+                    { dr: -1, dc: 1 },
+                    { dr: 1, dc: -1 },
+                    { dr: 1, dc: 1 }
+                ];
+                
+                for (const dir of directions) {
+                    const jumpRow = row + dir.dr * 2;
+                    const jumpCol = col + dir.dc * 2;
+                    const middleRow = row + dir.dr;
+                    const middleCol = col + dir.dc;
+                    
+                    if (isValidPosition(jumpRow, jumpCol) && 
+                        boardState[jumpRow][jumpCol] === 0 &&
+                        isValidPosition(middleRow, middleCol)) {
+                        
+                        const middlePiece = boardState[middleRow][middleCol];
+                        if (enemyPieces.includes(middlePiece)) {
+                            captures.push({ 
+                                row: jumpRow, 
+                                col: jumpCol, 
+                                isCapture: true,
+                                captureRow: middleRow,
+                                captureCol: middleCol,
+                                direction: dir
+                            });
+                        }
+                    }
+                }
+            }
+            
+            return captures;
+        }
+        
+        function isAvailableMove(row, col) {
+            return availableMoves.some(move => move.row === row && move.col === col);
+        }
+        
+        function isValidPosition(row, col) {
+            return row >= 0 && row < 8 && col >= 0 && col < 8;
+        }
+        
+        function makeMove(toRow, toCol) {
+            if (!selectedChecker) return;
+            
+            const move = availableMoves.find(m => m.row === toRow && m.col === toCol);
+            if (!move) return;
+            
+            const { row: fromRow, col: fromCol } = selectedChecker;
+            const piece = boardState[fromRow][fromCol];
+            
+            boardState[fromRow][fromCol] = 0;
+            boardState[toRow][toCol] = piece;
+            
+            if (move.isCapture) {
+                boardState[move.captureRow][move.captureCol] = 0;
+                addMoveToHistory(fromRow, fromCol, toRow, toCol, true);
+                
+                const newCaptures = getCapturesForChecker(toRow, toCol);
+                const canContinueCapture = newCaptures.length > 0;
+                
+                if (canContinueCapture) {
+                    selectedChecker = { row: toRow, col: toCol };
+                    availableMoves = newCaptures;
+                    
+                    updateBoardUI();
+                    highlightAvailableMoves();
+                    
+                    if (currentPlayer === 1) {
+                        showNotification('⚠️ Продолжайте взятие!');
+                    } else {
+                        setTimeout(() => {
+                            makeBotMove();
+                        }, 300);
+                    }
+                    return;
+                }
+            } else {
+                addMoveToHistory(fromRow, fromCol, toRow, toCol, false);
+            }
+            
+            if (piece === 1 && toRow === 0) {
+                boardState[toRow][toCol] = 3;
+                showNotification('👑 Ваша шашка стала дамкой!');
+            } else if (piece === 2 && toRow === 7) {
+                boardState[toRow][toCol] = 4;
+            }
+            
+            updateBoardUI();
+            clearSelection();
+            
+            currentPlayer = currentPlayer === 1 ? 2 : 1;
+            moveCount++;
+            updateGameStats();
+            updatePlayerCards();
+            
+            if (currentPlayer === 2 && gameActive) {
+                setTimeout(makeBotMove, 500);
+            }
+            
+            checkGameEnd();
+        }
+        
+        function highlightAvailableMoves() {
+            if (!selectedChecker) return;
+            
+            const { row, col } = selectedChecker;
+            const cell = document.querySelector(`.cell[data-row="${row}"][data-col="${col}"]`);
+            if (cell) {
+                cell.classList.add('selected');
+            }
+            
+            availableMoves.forEach(move => {
+                const targetCell = document.querySelector(`.cell[data-row="${move.row}"][data-col="${move.col}"]`);
+                if (targetCell) {
+                    targetCell.classList.add('available');
+                    if (move.isCapture) {
+                        targetCell.classList.add('capture');
+                    }
+                }
+            });
+        }
+        
+        function updateBoardUI() {
+            const cells = document.querySelectorAll('.cell');
+            cells.forEach(cell => {
+                const row = parseInt(cell.dataset.row);
+                const col = parseInt(cell.dataset.col);
+                const piece = boardState[row][col];
+                
+                const oldChecker = cell.querySelector('.checker');
+                if (oldChecker) {
+                    oldChecker.remove();
+                }
+                
+                if (fogOfWarActive && row < 4 && (piece === 2 || piece === 4)) {
+                    if (!revealedCells.has(`${row},${col}`)) {
+                        return;
+                    }
+                }
+                
+                if (piece !== 0) {
+                    const checker = document.createElement('div');
+                    checker.className = `checker player${piece === 1 || piece === 3 ? '1' : '2'}${piece > 2 ? ' king' : ''}`;
+                    checker.dataset.row = row;
+                    checker.dataset.col = col;
+                    cell.appendChild(checker);
+                }
+            });
+            
+            updateRevealedCells();
+        }
+        
+        function updateRevealedCells() {
+            if (!fogOfWarActive) return;
+            
+            const newRevealedCells = new Set();
+            
+            for (let row = 0; row < 8; row++) {
+                for (let col = 0; col < 8; col++) {
+                    if (boardState[row][col] === 1 || boardState[row][col] === 3) {
+                        for (let dr = -1; dr <= 1; dr++) {
+                            for (let dc = -1; dc <= 1; dc++) {
+                                const newRow = row + dr;
+                                const newCol = col + dc;
+                                
+                                if (isValidPosition(newRow, newCol) && newRow < 4) {
+                                    newRevealedCells.add(`${newRow},${newCol}`);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            
+            revealedCells = newRevealedCells;
+            
+            const cells = document.querySelectorAll('.cell[data-hidden="true"]');
+            cells.forEach(cell => {
+                const row = parseInt(cell.dataset.row);
+                const col = parseInt(cell.dataset.col);
+                
+                if (revealedCells.has(`${row},${col}`)) {
+                    cell.classList.remove('hidden');
+                    cell.classList.add('revealed');
+                    cell.classList.add((row + col) % 2 === 0 ? 'light' : 'dark');
+                    cell.dataset.hidden = 'false';
+                } else {
+                    cell.classList.add('hidden');
+                    cell.classList.remove('revealed', 'light', 'dark');
+                    cell.dataset.hidden = 'true';
+                }
+            });
+        }
+        
         // ====================================================
         // УЛУЧШЕННЫЙ ИИ БОТА
         // ====================================================
@@ -1407,15 +1714,12 @@
             }
             
             botThinking = true;
-            console.log('🤖 Бот начинает думать...');
             
             const difficulty = document.getElementById('botDifficulty').value;
             
-            // Получаем все возможные ходы
             const allMoves = [];
             const allCaptures = getAllCapturesForPlayer(2);
             
-            // Если есть взятия - используем только их
             if (allCaptures.length > 0) {
                 allCaptures.forEach(captureData => {
                     captureData.captures.forEach(capture => {
@@ -1429,7 +1733,6 @@
                     });
                 });
             } else {
-                // Обычные ходы
                 for (let row = 0; row < 8; row++) {
                     for (let col = 0; col < 8; col++) {
                         if (boardState[row][col] === 2 || boardState[row][col] === 4) {
@@ -1448,10 +1751,7 @@
                 }
             }
             
-            console.log('🤖 Все возможные ходы бота:', allMoves.length);
-            
             if (allMoves.length === 0) {
-                console.log('🤖 У бота нет возможных ходов');
                 botThinking = false;
                 checkGameEnd();
                 return;
@@ -1461,82 +1761,66 @@
             
             switch(difficulty) {
                 case 'easy':
-                    // Случайный ход
                     selectedMove = allMoves[Math.floor(Math.random() * allMoves.length)];
                     break;
                     
                 case 'medium':
-                    // Улучшенный средний уровень с базовой стратегией
                     selectedMove = getBestMoveMedium(allMoves);
                     break;
                     
                 case 'hard':
-                    // Сложный уровень с поиском на 2 хода вперед
                     selectedMove = getBestMoveHard(allMoves, 2);
                     break;
                     
                 case 'expert':
-                    // Экспертный уровень с поиском на 3-4 хода вперед
-                    selectedMove = getBestMoveHard(allMoves, 4);
+                    selectedMove = getBestMoveHard(allMoves, 3);
                     break;
             }
             
-            console.log('🤖 Бот выбрал ход:', selectedMove);
-            
-            // Выполняем ход с задержкой
             setTimeout(() => {
                 selectChecker(selectedMove.from.row, selectedMove.from.col);
                 
                 setTimeout(() => {
                     makeMove(selectedMove.to.row, selectedMove.to.col);
                     botThinking = false;
-                    console.log('🤖 Бот завершил ход');
                 }, 300);
             }, 500);
         }
         
         function getBestMoveMedium(moves) {
-            // Оцениваем каждый ход
             moves.forEach(move => {
                 let score = 0;
                 const piece = boardState[move.from.row][move.from.col];
                 
-                // Взятие дает много очков
                 if (move.isCapture) {
                     const capturedPiece = boardState[move.captureData.captureRow][move.captureData.captureCol];
                     score += (capturedPiece === 3 || capturedPiece === 4) ? 20 : 10;
                     
-                    // Дополнительные очки за серию взятий
                     const tempBoard = JSON.parse(JSON.stringify(boardState));
                     tempBoard[move.from.row][move.from.col] = 0;
                     tempBoard[move.to.row][move.to.col] = piece;
                     tempBoard[move.captureData.captureRow][move.captureData.captureCol] = 0;
                     
-                    // Проверяем возможность продолжения взятия
                     const nextCaptures = getCapturesForChecker(move.to.row, move.to.col);
                     if (nextCaptures.length > 0) {
                         score += 15;
                     }
                 }
                 
-                // Превращение в дамку
                 if (piece === 2 && move.to.row === 7) {
                     score += 15;
                 }
                 
-                // Движение вперед
                 if (move.to.row > move.from.row) {
                     score += 3;
                 }
                 
-                // Контроль центра
                 const fromCenterDist = Math.abs(move.from.col - 3.5) + Math.abs(move.from.row - 3.5);
                 const toCenterDist = Math.abs(move.to.col - 3.5) + Math.abs(move.to.row - 3.5);
                 if (toCenterDist < fromCenterDist) {
                     score += 2;
                 }
                 
-                // Защита своих шашек
                 if (!isVulnerable(move.to.row, move.to.col, 2)) {
                     score += 2;
                 }
@@ -1544,7 +1828,6 @@
                 move.score = score;
             });
             
-            // Выбираем ход с максимальным счетом
             return moves.reduce((best, current) => current.score > best.score ? current : best, moves[0]);
         }
         
@@ -1552,9 +1835,7 @@
             let bestMove = moves[0];
             let bestScore = -Infinity;
             
-            // Оцениваем каждый ход с помощью минимакса
             moves.forEach(move => {
-                // Симулируем ход
                 const simulatedBoard = JSON.parse(JSON.stringify(boardState));
                 const piece = simulatedBoard[move.from.row][move.from.col];
                 
@@ -1565,12 +1846,10 @@
                     simulatedBoard[move.captureData.captureRow][move.captureData.captureCol] = 0;
                 }
                 
-                // Проверяем превращение в дамку
                 if (piece === 2 && move.to.row === 7) {
                     simulatedBoard[move.to.row][move.to.col] = 4;
                 }
                 
-                // Оцениваем позицию после хода
                 const score = minimax(simulatedBoard, depth - 1, -Infinity, Infinity, false);
                 
                 if (score > bestScore) {
@@ -1588,7 +1867,6 @@
             }
             
             if (isMaximizing) {
-                // Ход бота (максимизируем)
                 let maxEval = -Infinity;
                 const moves = getAllPossibleMoves(board, 2);
                 
@@ -1597,11 +1875,10 @@
                     const eval = minimax(newBoard, depth - 1, alpha, beta, false);
                     maxEval = Math.max(maxEval, eval);
                     alpha = Math.max(alpha, eval);
-                    if (beta <= alpha) break; // Альфа-бета отсечение
+                    if (beta <= alpha) break;
                 }
                 return maxEval;
             } else {
-                // Ход игрока (минимизируем)
                 let minEval = Infinity;
                 const moves = getAllPossibleMoves(board, 1);
                 
@@ -1610,7 +1887,7 @@
                     const eval = minimax(newBoard, depth - 1, alpha, beta, true);
                     minEval = Math.min(minEval, eval);
                     beta = Math.min(beta, eval);
-                    if (beta <= alpha) break; // Альфа-бета отсечение
+                    if (beta <= alpha) break;
                 }
                 return minEval;
             }
@@ -1619,23 +1896,21 @@
         function evaluateBoard(board) {
             let score = 0;
             
-            // Считаем материал
             for (let row = 0; row < 8; row++) {
                 for (let col = 0; col < 8; col++) {
                     const piece = board[row][col];
                     if (piece === 2) {
-                        score += 10; // Обычная шашка бота
+                        score += 10;
                     } else if (piece === 4) {
-                        score += 30; // Дамка бота
+                        score += 30;
                     } else if (piece === 1) {
-                        score -= 10; // Обычная шашка игрока
+                        score -= 10;
                     } else if (piece === 3) {
-                        score -= 30; // Дамка игрока
+                        score -= 30;
                     }
                 }
             }
             
-            // Бонус за контроль центра
             for (let row = 3; row <= 4; row++) {
                 for (let col = 2; col <= 5; col++) {
                     if (board[row][col] === 2 || board[row][col] === 4) {
@@ -1646,13 +1921,11 @@
                 }
             }
             
-            // Бонус за безопасность (шашки у края доски)
             for (let col = 0; col < 8; col++) {
                 if (board[0][col] === 2) score += 1;
                 if (board[7][col] === 1) score -= 1;
             }
             
-            // Штраф за изолированные шашки
             score += evaluatePieceSafety(board, 2) * 0.5;
             score -= evaluatePieceSafety(board, 1) * 0.5;
             
@@ -1666,11 +1939,7 @@
             for (let row = 0; row < 8; row++) {
                 for (let col = 0; col < 8; col++) {
                     if (pieceType.includes(board[row][col])) {
-                        // Проверяем, защищена ли шашка другой шашкой
-                        const isProtected = checkProtection(board, row, col, player);
-                        if (isProtected) safetyScore += 1;
-                        
-                        // Штраф за шашки, которые можно взять
+                        if (checkProtection(board, row, col, player)) safetyScore += 1;
                         if (isVulnerableInBoard(board, row, col, player)) {
                             safetyScore -= 2;
                         }
@@ -1703,243 +1972,6 @@
             return false;
         }
         
-        function getAllPossibleMoves(board, player) {
-            const moves = [];
-            const allCaptures = getAllCapturesForPlayerInBoard(board, player);
-            
-            if (allCaptures.length > 0) {
-                allCaptures.forEach(captureData => {
-                    captureData.captures.forEach(capture => {
-                        moves.push({
-                            from: captureData.from,
-                            to: { row: capture.row, col: capture.col },
-                            isCapture: true,
-                            captureData: capture
-                        });
-                    });
-                });
-            } else {
-                for (let row = 0; row < 8; row++) {
-                    for (let col = 0; col < 8; col++) {
-                        if ((player === 2 && (board[row][col] === 2 || board[row][col] === 4)) ||
-                            (player === 1 && (board[row][col] === 1 || board[row][col] === 3))) {
-                            const pieceMoves = getAvailableMovesInBoard(board, row, col);
-                            pieceMoves.forEach(move => {
-                                moves.push({
-                                    from: { row, col },
-                                    to: { row: move.row, col: move.col },
-                                    isCapture: move.isCapture,
-                                    moveData: move
-                                });
-                            });
-                        }
-                    }
-                }
-            }
-            
-            return moves;
-        }
-        
-        function simulateMove(board, move) {
-            const newBoard = JSON.parse(JSON.stringify(board));
-            const piece = newBoard[move.from.row][move.from.col];
-            
-            newBoard[move.from.row][move.from.col] = 0;
-            newBoard[move.to.row][move.to.col] = piece;
-            
-            if (move.isCapture) {
-                newBoard[move.captureData.captureRow][move.captureData.captureCol] = 0;
-            }
-            
-            // Превращение в дамку
-            if (piece === 2 && move.to.row === 7) {
-                newBoard[move.to.row][move.to.col] = 4;
-            } else if (piece === 1 && move.to.row === 0) {
-                newBoard[move.to.row][move.to.col] = 3;
-            }
-            
-            return newBoard;
-        }
-        
-        // ====================================================
-        // ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ДЛЯ ИИ
-        // ====================================================
-        function getAllCapturesForPlayerInBoard(board, player) {
-            const captures = [];
-            
-            for (let row = 0; row < 8; row++) {
-                for (let col = 0; col < 8; col++) {
-                    const piece = board[row][col];
-                    if ((player === 1 && (piece === 1 || piece === 3)) || 
-                        (player === 2 && (piece === 2 || piece === 4))) {
-                        const checkerCaptures = getCapturesForCheckerInBoard(board, row, col, player);
-                        if (checkerCaptures.length > 0) {
-                            captures.push({
-                                from: { row, col },
-                                captures: checkerCaptures
-                            });
-                        }
-                    }
-                }
-            }
-            
-            return captures;
-        }
-        
-        function getCapturesForCheckerInBoard(board, row, col, player) {
-            const piece = board[row][col];
-            const captures = [];
-            
-            if (piece === 0) return captures;
-            
-            const isKing = piece > 2;
-            const enemyPieces = player === 1 ? [2, 4] : [1, 3];
-            
-            if (isKing) {
-                const directions = [
-                    { dr: -1, dc: -1 },
-                    { dr: -1, dc: 1 },
-                    { dr: 1, dc: -1 },
-                    { dr: 1, dc: 1 }
-                ];
-                
-                for (const dir of directions) {
-                    let currentRow = row + dir.dr;
-                    let currentCol = col + dir.dc;
-                    let foundEnemy = false;
-                    let enemyRow = -1;
-                    let enemyCol = -1;
-                    
-                    while (isValidPosition(currentRow, currentCol)) {
-                        if (board[currentRow][currentCol] === 0) {
-                            if (foundEnemy) {
-                                captures.push({
-                                    row: currentRow,
-                                    col: currentCol,
-                                    isCapture: true,
-                                    captureRow: enemyRow,
-                                    captureCol: enemyCol,
-                                    isKingCapture: true,
-                                    direction: dir
-                                });
-                            }
-                        } else if (enemyPieces.includes(board[currentRow][currentCol])) {
-                            if (!foundEnemy) {
-                                foundEnemy = true;
-                                enemyRow = currentRow;
-                                enemyCol = currentCol;
-                            } else {
-                                break;
-                            }
-                        } else {
-                            break;
-                        }
-                        currentRow += dir.dr;
-                        currentCol += dir.dc;
-                    }
-                }
-            } else {
-                const directions = [
-                    { dr: -1, dc: -1 },
-                    { dr: -1, dc: 1 },
-                    { dr: 1, dc: -1 },
-                    { dr: 1, dc: 1 }
-                ];
-                
-                for (const dir of directions) {
-                    const jumpRow = row + dir.dr * 2;
-                    const jumpCol = col + dir.dc * 2;
-                    const middleRow = row + dir.dr;
-                    const middleCol = col + dir.dc;
-                    
-                    if (isValidPosition(jumpRow, jumpCol) && 
-                        board[jumpRow][jumpCol] === 0 &&
-                        isValidPosition(middleRow, middleCol)) {
-                        
-                        const middlePiece = board[middleRow][middleCol];
-                        if (enemyPieces.includes(middlePiece)) {
-                            captures.push({ 
-                                row: jumpRow, 
-                                col: jumpCol, 
-                                isCapture: true,
-                                captureRow: middleRow,
-                                captureCol: middleCol,
-                                direction: dir
-                            });
-                        }
-                    }
-                }
-            }
-            
-            return captures;
-        }
-        
-        function getAvailableMovesInBoard(board, row, col) {
-            const piece = board[row][col];
-            const moves = [];
-            
-            if (piece === 0) return moves;
-            
-            const isKing = piece > 2;
-            const player = piece === 1 || piece === 3 ? 1 : 2;
-            
-            const allCaptures = getAllCapturesForPlayerInBoard(board, player);
-            
-            if (allCaptures.length > 0) {
-                return getCapturesForCheckerInBoard(board, row, col, player);
-            }
-            
-            if (isKing) {
-                const directions = [
-                    { dr: -1, dc: -1 },
-                    { dr: -1, dc: 1 },
-                    { dr: 1, dc: -1 },
-                    { dr: 1, dc: 1 }
-                ];
-                
-                for (const dir of directions) {
-                    let newRow = row + dir.dr;
-                    let newCol = col + dir.dc;
-                    
-                    while (isValidPosition(newRow, newCol) && board[newRow][newCol] === 0) {
-                        moves.push({ 
-                            row: newRow, 
-                            col: newCol, 
-                            isCapture: false,
-                            direction: dir
-                        });
-                        newRow += dir.dr;
-                        newCol += dir.dc;
-                    }
-                }
-            } else {
-                const directions = [];
-                if (player === 1) {
-                    directions.push({ dr: -1, dc: -1 });
-                    directions.push({ dr: -1, dc: 1 });
-                } else {
-                    directions.push({ dr: 1, dc: -1 });
-                    directions.push({ dr: 1, dc: 1 });
-                }
-                
-                for (const dir of directions) {
-                    const newRow = row + dir.dr;
-                    const newCol = col + dir.dc;
-                    
-                    if (isValidPosition(newRow, newCol) && board[newRow][newCol] === 0) {
-                        moves.push({ 
-                            row: newRow, 
-                            col: newCol, 
-                            isCapture: false,
-                            direction: dir
-                        });
-                    }
-                }
-            }
-            
-            return moves;
-        }
-        
         function isVulnerableInBoard(board, row, col, player) {
             const enemyPlayer = player === 1 ? 2 : 1;
             const enemyPieces = enemyPlayer === 1 ? [1, 3] : [2, 4];
@@ -1968,28 +2000,184 @@
             return false;
         }
         
-        // ====================================================
-        // ОСНОВНАЯ ИГРОВАЯ ЛОГИКА (остальные функции)
-        // ====================================================
-        
-        // [ОСТАВЛЯЕМ ВСЕ ОСТАЛЬНЫЕ ФУНКЦИИ ИЗ ПРЕДЫДУЩЕЙ ВЕРСИИ, КОТОРЫЕ НЕ БЫЛИ ИЗМЕНЕНЫ]
-        // Из-за ограничения длины ответа я опущу повторение неизмененных функций, но отмечу важные изменения:
-        
-        // 1. В функции makeMove добавляем проверку режима поддавков:
-        function makeMove(toRow, toCol) {
-            // ... предыдущий код ...
+        function isVulnerable(row, col, player) {
+            const enemyPlayer = player === 1 ? 2 : 1;
+            const enemyPieces = enemyPlayer === 1 ? [1, 3] : [2, 4];
             
-            // В конце функции, при проверке окончания игры:
-            checkGameEnd();
+            const directions = [
+                { dr: -1, dc: -1 },
+                { dr: -1, dc: 1 },
+                { dr: 1, dc: -1 },
+                { dr: 1, dc: 1 }
+            ];
+            
+            for (const dir of directions) {
+                const attackRow = row - dir.dr;
+                const attackCol = col - dir.dc;
+                const jumpRow = row + dir.dr;
+                const jumpCol = col + dir.dc;
+                
+                if (isValidPosition(attackRow, attackCol) && 
+                    isValidPosition(jumpRow, jumpCol) &&
+                    enemyPieces.includes(boardState[attackRow][attackCol]) &&
+                    boardState[jumpRow][jumpCol] === 0) {
+                    return true;
+                }
+            }
+            
+            return false;
         }
         
+        function getAllPossibleMoves(board, player) {
+            const moves = [];
+            
+            for (let row = 0; row < 8; row++) {
+                for (let col = 0; col < 8; col++) {
+                    if ((player === 2 && (board[row][col] === 2 || board[row][col] === 4)) ||
+                        (player === 1 && (board[row][col] === 1 || board[row][col] === 3))) {
+                        
+                        const pieceMoves = getAvailableMovesForPiece(board, row, col, player);
+                        pieceMoves.forEach(move => {
+                            moves.push({
+                                from: { row, col },
+                                to: { row: move.row, col: move.col },
+                                isCapture: move.isCapture,
+                                captureData: move
+                            });
+                        });
+                    }
+                }
+            }
+            
+            return moves;
+        }
+        
+        function getAvailableMovesForPiece(board, row, col, player) {
+            const piece = board[row][col];
+            const moves = [];
+            
+            if (piece === 0) return moves;
+            
+            const isKing = piece > 2;
+            const enemyPieces = player === 1 ? [2, 4] : [1, 3];
+            
+            if (isKing) {
+                const directions = [
+                    { dr: -1, dc: -1 },
+                    { dr: -1, dc: 1 },
+                    { dr: 1, dc: -1 },
+                    { dr: 1, dc: 1 }
+                ];
+                
+                for (const dir of directions) {
+                    let currentRow = row + dir.dr;
+                    let currentCol = col + dir.dc;
+                    let foundEnemy = false;
+                    let enemyRow = -1;
+                    let enemyCol = -1;
+                    
+                    while (currentRow >= 0 && currentRow < 8 && currentCol >= 0 && currentCol < 8) {
+                        if (board[currentRow][currentCol] === 0) {
+                            if (foundEnemy) {
+                                moves.push({
+                                    row: currentRow,
+                                    col: currentCol,
+                                    isCapture: true,
+                                    captureRow: enemyRow,
+                                    captureCol: enemyCol
+                                });
+                            } else {
+                                moves.push({
+                                    row: currentRow,
+                                    col: currentCol,
+                                    isCapture: false
+                                });
+                            }
+                        } else if (enemyPieces.includes(board[currentRow][currentCol])) {
+                            if (!foundEnemy) {
+                                foundEnemy = true;
+                                enemyRow = currentRow;
+                                enemyCol = currentCol;
+                            } else {
+                                break;
+                            }
+                        } else {
+                            break;
+                        }
+                        currentRow += dir.dr;
+                        currentCol += dir.dc;
+                    }
+                }
+            } else {
+                const directions = [];
+                if (player === 1) {
+                    directions.push({ dr: -1, dc: -1 });
+                    directions.push({ dr: -1, dc: 1 });
+                } else {
+                    directions.push({ dr: 1, dc: -1 });
+                    directions.push({ dr: 1, dc: 1 });
+                }
+                
+                for (const dir of directions) {
+                    const newRow = row + dir.dr;
+                    const newCol = col + dir.dc;
+                    const jumpRow = row + dir.dr * 2;
+                    const jumpCol = col + dir.dc * 2;
+                    
+                    if (newRow >= 0 && newRow < 8 && newCol >= 0 && newCol < 8) {
+                        if (board[newRow][newCol] === 0) {
+                            moves.push({ 
+                                row: newRow, 
+                                col: newCol, 
+                                isCapture: false
+                            });
+                        } else if (enemyPieces.includes(board[newRow][newCol]) &&
+                                   jumpRow >= 0 && jumpRow < 8 && jumpCol >= 0 && jumpCol < 8 &&
+                                   board[jumpRow][jumpCol] === 0) {
+                            moves.push({ 
+                                row: jumpRow, 
+                                col: jumpCol, 
+                                isCapture: true,
+                                captureRow: newRow,
+                                captureCol: newCol
+                            });
+                        }
+                    }
+                }
+            }
+            
+            return moves;
+        }
+        
+        function simulateMove(board, move) {
+            const newBoard = JSON.parse(JSON.stringify(board));
+            const piece = newBoard[move.from.row][move.from.col];
+            
+            newBoard[move.from.row][move.from.col] = 0;
+            newBoard[move.to.row][move.to.col] = piece;
+            
+            if (move.isCapture) {
+                newBoard[move.captureData.captureRow][move.captureData.captureCol] = 0;
+            }
+            
+            if (piece === 2 && move.to.row === 7) {
+                newBoard[move.to.row][move.to.col] = 4;
+            } else if (piece === 1 && move.to.row === 0) {
+                newBoard[move.to.row][move.to.col] = 3;
+            }
+            
+            return newBoard;
+        }
+        
+        // ====================================================
+        // ДОПОЛНИТЕЛЬНЫЕ ФУНКЦИИ ИГРЫ
+        // ====================================================
         function checkGameEnd() {
             let player1HasPieces = false;
             let player2HasPieces = false;
             let player1HasMoves = false;
             let player2HasMoves = false;
             
-            // Считаем шашки
             for (let row = 0; row < 8; row++) {
                 for (let col = 0; col < 8; col++) {
                     const piece = boardState[row][col];
@@ -2008,20 +2196,17 @@
                 }
             }
             
-            // В режиме поддавков условия противоположные
             if (gameMode === 'giveaway') {
-                // Проигрывает тот, у кого не осталось шашек или ходов
                 if (!player1HasPieces || !player1HasMoves) {
-                    endGame(2); // Бот победил (игрок проиграл)
+                    endGame(2);
                 } else if (!player2HasPieces || !player2HasMoves) {
-                    endGame(1); // Игрок победил (бот проиграл)
+                    endGame(1);
                 }
             } else {
-                // Обычные правила
                 if (!player1HasPieces || !player1HasMoves) {
-                    endGame(2); // Бот победил
+                    endGame(2);
                 } else if (!player2HasPieces || !player2HasMoves) {
-                    endGame(1); // Игрок победил
+                    endGame(1);
                 }
             }
         }
@@ -2030,27 +2215,24 @@
             gameActive = false;
             
             let message = '';
-            let shouldUpdateStats = true;
             
             if (gameMode === 'giveaway') {
-                // В поддавках победа/поражение обратные
                 if (winner === 1) {
                     message = '🎉 Вы проиграли! (Победа в поддавках)';
                     document.getElementById('game-status').textContent = message;
                     showNotification('🎉 Вы успешно отдали все шашки! Победа в поддавках!');
                     if (currentUser) {
-                        updateUserStats('win'); // В поддавках это победа
+                        updateUserStats('win');
                     }
                 } else {
                     message = '😞 Бот проиграл (Вы победили в поддавках)';
                     document.getElementById('game-status').textContent = message;
                     showNotification('😞 Бот отдал все шашки! Вы проиграли в поддавках.');
                     if (currentUser) {
-                        updateUserStats('loss'); // В поддавках это поражение
+                        updateUserStats('loss');
                     }
                 }
             } else {
-                // Обычные правила
                 if (winner === 1) {
                     message = '🎉 Вы победили!';
                     document.getElementById('game-status').textContent = message;
@@ -2069,8 +2251,133 @@
             }
         }
         
+        function updateGameStats() {
+            let player1Pieces = 0;
+            let player2Pieces = 0;
+            let kingsCount = 0;
+            
+            for (let row = 0; row < 8; row++) {
+                for (let col = 0; col < 8; col++) {
+                    const piece = boardState[row][col];
+                    if (piece === 1 || piece === 3) {
+                        player1Pieces++;
+                        if (piece === 3) kingsCount++;
+                    }
+                    if (piece === 2 || piece === 4) {
+                        player2Pieces++;
+                        if (piece === 4) kingsCount++;
+                    }
+                }
+            }
+            
+            document.getElementById('move-count').textContent = moveCount;
+            document.getElementById('player1-pieces').textContent = player1Pieces;
+            document.getElementById('player2-pieces').textContent = player2Pieces;
+            document.getElementById('kings-count').textContent = kingsCount;
+        }
+        
+        function addMoveToHistory(fromRow, fromCol, toRow, toCol, isCapture) {
+            const movesHistory = document.getElementById('moves-history');
+            const moveNumber = Math.ceil(moveCount / 2);
+            const player = moveCount % 2 === 1 ? 'Игрок' : 'Бот';
+            
+            const moveNotation = `${String.fromCharCode(97 + fromCol)}${8 - fromRow}-${String.fromCharCode(97 + toCol)}${8 - toRow}`;
+            
+            const moveElement = document.createElement('div');
+            moveElement.className = 'move-item';
+            moveElement.innerHTML = `
+                <strong>${moveNumber}. ${player}:</strong> ${moveNotation} ${isCapture ? '✗' : ''}
+            `;
+            
+            movesHistory.appendChild(moveElement);
+            movesHistory.scrollTop = movesHistory.scrollHeight;
+        }
+        
+        function updatePlayerCards() {
+            const player1Card = document.getElementById('player1-card');
+            const player2Card = document.getElementById('player2-card');
+            
+            player1Card.classList.remove('active');
+            player2Card.classList.remove('active');
+            
+            if (currentPlayer === 1) {
+                player1Card.classList.add('active');
+                document.getElementById('game-status').textContent = 'Ваш ход';
+            } else {
+                player2Card.classList.add('active');
+                document.getElementById('game-status').textContent = 'Ход бота...';
+            }
+        }
+        
+        function startNewGame() {
+            console.log('🆕 Начало новой игры');
+            
+            initBoard();
+            currentPlayer = 1;
+            gameActive = true;
+            selectedChecker = null;
+            availableMoves = [];
+            moveCount = 1;
+            forcedCaptureChecker = null;
+            
+            updatePlayerCards();
+            updateGameStats();
+            
+            document.getElementById('moves-history').innerHTML = '';
+            
+            document.getElementById('game-status').textContent = 'Игра началась! Ваш ход';
+            
+            if (Math.random() < 0.5) {
+                currentPlayer = 2;
+                updatePlayerCards();
+                document.getElementById('game-status').textContent = 'Бот ходит первым...';
+                setTimeout(makeBotMove, 1000);
+            }
+        }
+        
+        function surrender() {
+            if (!gameActive) return;
+            
+            if (confirm('Вы уверены, что хотите сдаться?')) {
+                endGame(2);
+            }
+        }
+        
+        function showRules() {
+            const rules = `
+                📜 Правила русских шашек:
+                
+                1. Шашки ходят по диагонали на одну клетку вперед
+                2. Дамки ходят на любое количество клеток по диагонали
+                3. Если есть возможность бить - вы обязаны бить
+                4. Бить можно и вперед, и назад
+                5. Дамка может бить на любое расстояние
+                6. При достижении последней горизонтали шашка становится дамкой
+                7. При взятии можно продолжать бить дальше
+                
+                Удачи в игре! 🎮
+            `;
+            
+            alert(rules);
+        }
+        
+        function updateBotLevel() {
+            const difficulty = document.getElementById('botDifficulty').value;
+            let levelName = '';
+            
+            switch(difficulty) {
+                case 'easy': levelName = 'Легкий'; break;
+                case 'medium': levelName = 'Средний'; break;
+                case 'hard': levelName = 'Сложный'; break;
+                case 'expert': levelName = 'Эксперт'; break;
+            }
+            
+            document.getElementById('player2-rating').textContent = `Уровень: ${levelName}`;
+            showNotification(`✅ Уровень бота изменен на: ${levelName}`);
+        }
+        
         // ====================================================
-        // ЧАТ С АДМИН-ФУНКЦИЯМИ
+        // ЧАТ
         // ====================================================
         async function sendMessage() {
             const messageInput = document.getElementById('message');
@@ -2149,15 +2456,29 @@
         // ИНТЕРФЕЙС ПОЛЬЗОВАТЕЛЯ
         // ====================================================
         function showAuthScreen() {
+            // Останавливаем игру
+            gameActive = false;
+            botThinking = false;
+            
+            // Отписываемся от чата
+            if (chatListener) {
+                chatRef.off('value', chatListener);
+                chatListener = null;
+            }
+            
+            // Скрываем все игровые элементы
             document.getElementById('auth').style.display = 'block';
             document.getElementById('user-info-panel').style.display = 'none';
             document.getElementById('game').style.display = 'none';
             document.getElementById('admin-panel').style.display = 'none';
             
-            if (chatRef) {
-                chatRef.off('value');
-                chatRef = null;
-            }
+            // Очищаем поля ввода
+            document.getElementById('login').value = '';
+            document.getElementById('password').value = '';
+            document.getElementById('authMessage').textContent = '';
+            
+            // Сбрасываем состояние чата
+            document.getElementById('chat-messages').innerHTML = '';
         }
         
         function showGameScreen() {
@@ -2168,18 +2489,18 @@
             updateUserUI();
             startNewGame();
             
-            // Показываем админ-кнопку если пользователь админ
             if (currentUser?.isAdmin) {
                 document.getElementById('adminPanelBtn').style.display = 'inline-block';
                 document.getElementById('adminBadge').style.display = 'inline-block';
             }
             
-            // Подписка на чат
+            // Подписка на чат с правильной обработкой
             chatRef = database.ref('chat').limitToLast(50);
-            chatRef.on('value', (snapshot) => {
+            chatListener = (snapshot) => {
                 const messages = snapshot.val();
                 updateChat(messages);
-            });
+            };
+            chatRef.on('value', chatListener);
         }
         
         function updateUserUI() {
@@ -2194,23 +2515,33 @@
             document.getElementById('player1-name').textContent = currentUser.username;
         }
         
-        function updateBotLevel() {
-            const difficulty = document.getElementById('botDifficulty').value;
-            let levelName = '';
+        async function updateUserStats(result) {
+            if (!currentUser) return;
             
-            switch(difficulty) {
-                case 'easy': levelName = 'Легкий'; break;
-                case 'medium': levelName = 'Средний'; break;
-                case 'hard': levelName = 'Сложный'; break;
-                case 'expert': levelName = 'Эксперт'; break;
+            try {
+                const updates = {};
+                if (result === 'win') {
+                    updates.wins = (currentUser.wins || 0) + 1;
+                    updates.rating = (currentUser.rating || 1000) + 10;
+                } else if (result === 'loss') {
+                    updates.losses = (currentUser.losses || 0) + 1;
+                    updates.rating = Math.max(100, (currentUser.rating || 1000) - 10);
+                } else {
+                    updates.draws = (currentUser.draws || 0) + 1;
+                }
+                
+                await database.ref('users/' + currentUser.uid).update(updates);
+                
+                Object.assign(currentUser, updates);
+                updateUserUI();
+                
+            } catch (error) {
+                console.error('❌ Ошибка обновления статистики:', error);
             }
-            
-            document.getElementById('player2-rating').textContent = `Уровень: ${levelName}`;
-            showNotification(`✅ Уровень бота изменен на: ${levelName}`);
         }
         
         // ====================================================
-        // УТИЛИТЫ (остаются без изменений)
+        // УТИЛИТЫ
         // ====================================================
         function showAuthMessage(message, type = 'error') {
             const authMessage = document.getElementById('authMessage');
@@ -2268,7 +2599,6 @@
             }
         }
         
-        // Инициализация при загрузке
         window.onload = function() {
             console.log('🎮 Игра загружена и готова к работе!');
         };
