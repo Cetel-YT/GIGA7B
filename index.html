@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Онлайн шашки</title>
+    <title>Онлайн шашки 3</title>
     
     <!-- Firebase SDK -->
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
@@ -311,6 +311,16 @@
             background: rgba(255, 50, 50, 0.8);
             width: 25px;
             height: 25px;
+        }
+        
+        .cell.must-capture {
+            animation: pulse 1.5s infinite;
+        }
+        
+        @keyframes pulse {
+            0% { box-shadow: inset 0 0 0 3px rgba(255, 255, 0, 0.8); }
+            50% { box-shadow: inset 0 0 0 3px rgba(255, 255, 0, 0.4); }
+            100% { box-shadow: inset 0 0 0 3px rgba(255, 255, 0, 0.8); }
         }
         
         .checker {
@@ -801,6 +811,7 @@
         let botThinking = false;
         let moveCount = 1;
         let forcedCaptureChecker = null; // Шашка, обязанная бить
+        let chatRef = null; // Ссылка на чат в Firebase
         
         // ====================================================
         // ИНИЦИАЛИЗАЦИЯ ПРИ ЗАГРУЗКЕ
@@ -844,6 +855,10 @@
         function setupEventListeners() {
             document.getElementById('password')?.addEventListener('keypress', function(e) {
                 if (e.key === 'Enter') login();
+            });
+            
+            document.getElementById('message')?.addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') sendMessage();
             });
         }
         
@@ -957,7 +972,6 @@
                     });
                     
                     showGameScreen();
-                    startNewGame();
                     showNotification('✅ Вход выполнен!');
                 }
             } catch (error) {
@@ -1028,39 +1042,62 @@
         }
         
         function handleCellClick(row, col) {
-            console.log('🖱️ Клик по клетке:', row, col, 'gameActive:', gameActive);
+            console.log('🖱️ Клик по клетке:', row, col, 'Текущий игрок:', currentPlayer, 'gameActive:', gameActive);
             
-            if (!gameActive || currentPlayer !== 1 || botThinking) {
-                console.log('⚠️ Сейчас не ваш ход или игра не активна');
+            if (!gameActive || botThinking) {
+                console.log('⚠️ Игра не активна или бот думает');
                 return;
             }
             
-            const piece = boardState[row][col];
-            
-            // Если выбрана шашка игрока
-            if ((currentPlayer === 1 && (piece === 1 || piece === 3))) {
-                // Проверяем, есть ли обязательное взятие
-                const allCaptures = getAllCapturesForPlayer(1);
-                if (allCaptures.length > 0) {
-                    // Проверяем, может ли эта конкретная шашка бить
-                    const capturesForThisChecker = getCapturesForChecker(row, col);
-                    if (capturesForThisChecker.length > 0) {
-                        console.log('✅ Выбрана шашка игрока с обязательным взятием');
-                        selectChecker(row, col);
+            // Если сейчас ход игрока
+            if (currentPlayer === 1) {
+                const piece = boardState[row][col];
+                
+                // Если кликнули на шашку игрока
+                if (piece === 1 || piece === 3) {
+                    // Проверяем, есть ли обязательное взятие для всего поля
+                    const allCaptures = getAllCapturesForPlayer(1);
+                    
+                    if (allCaptures.length > 0) {
+                        // Проверяем, может ли эта конкретная шашка бить
+                        const capturesForChecker = getCapturesForChecker(row, col);
+                        if (capturesForChecker.length > 0) {
+                            console.log('✅ Выбрана шашка игрока с обязательным взятием');
+                            selectChecker(row, col);
+                        } else {
+                            console.log('⚠️ Эта шашка не может бить, но другие могут');
+                            showNotification('⚠️ Вы должны бить другой шашкой!');
+                            // Подсвечиваем шашки, которые могут бить
+                            highlightForcedCaptures();
+                        }
                     } else {
-                        console.log('⚠️ Эта шашка не может бить, выберите другую');
-                        showNotification('⚠️ Вы должны бить другой шашкой!');
+                        // Нет обязательных взятий - выбираем шашку
+                        console.log('✅ Выбрана шашка игрока');
+                        selectChecker(row, col);
                     }
-                } else {
-                    console.log('✅ Выбрана шашка игрока');
-                    selectChecker(row, col);
+                }
+                // Если кликнули на доступную клетку и есть выбранная шашка
+                else if (selectedChecker && isAvailableMove(row, col)) {
+                    console.log('✅ Ход на клетку:', row, col);
+                    makeMove(row, col);
                 }
             }
-            // Если выбрана доступная клетка для хода
-            else if (selectedChecker && isAvailableMove(row, col)) {
-                console.log('✅ Ход на клетку:', row, col);
-                makeMove(row, col);
-            }
+        }
+        
+        function highlightForcedCaptures() {
+            // Очищаем предыдущую подсветку
+            document.querySelectorAll('.cell.must-capture').forEach(cell => {
+                cell.classList.remove('must-capture');
+            });
+            
+            const allCaptures = getAllCapturesForPlayer(1);
+            allCaptures.forEach(captureData => {
+                const { row, col } = captureData.from;
+                const cell = document.querySelector(`.cell[data-row="${row}"][data-col="${col}"]`);
+                if (cell) {
+                    cell.classList.add('must-capture');
+                }
+            });
         }
         
         function selectChecker(row, col) {
@@ -1087,6 +1124,11 @@
                     }
                 }
             });
+            
+            // Убираем подсветку обязательных взятий
+            document.querySelectorAll('.cell.must-capture').forEach(cell => {
+                cell.classList.remove('must-capture');
+            });
         }
         
         function clearSelection() {
@@ -1096,6 +1138,10 @@
             
             document.querySelectorAll('.cell.available').forEach(cell => {
                 cell.classList.remove('available', 'capture');
+            });
+            
+            document.querySelectorAll('.cell.must-capture').forEach(cell => {
+                cell.classList.remove('must-capture');
             });
             
             selectedChecker = null;
@@ -1308,59 +1354,42 @@
             const { row: fromRow, col: fromCol } = selectedChecker;
             const piece = boardState[fromRow][fromCol];
             
-            console.log('🎮 Ход:', fromRow, fromCol, '->', toRow, toCol, 'Фигура:', piece);
+            console.log('🎮 Ход от', currentPlayer === 1 ? 'Игрока' : 'Бота', fromRow, fromCol, '->', toRow, toCol);
             
             // Обновляем состояние доски
             boardState[fromRow][fromCol] = 0;
             boardState[toRow][toCol] = piece;
             
-            // Если было взятие, удаляем шашку соперника
+            // Если было взятие
             if (move.isCapture) {
                 boardState[move.captureRow][move.captureCol] = 0;
                 console.log('🎯 Взятие фигуры на:', move.captureRow, move.captureCol);
                 
-                // Добавляем в историю ходов
                 addMoveToHistory(fromRow, fromCol, toRow, toCol, true);
                 
-                // Проверяем возможность продолжения взятия (для дамок и обычных шашек)
-                if (move.isKingCapture) {
-                    // Для дамки проверяем возможность дальнейшего взятия в том же направлении
-                    const newCaptures = getCapturesForChecker(toRow, toCol);
-                    const canContinueCapture = newCaptures.some(capture => {
-                        // Проверяем, что взятие в том же направлении
-                        return Math.sign(capture.row - toRow) === Math.sign(move.direction.dr) &&
-                               Math.sign(capture.col - toCol) === Math.sign(move.direction.dc);
-                    });
+                // Проверяем возможность продолжения взятия
+                const newCaptures = getCapturesForChecker(toRow, toCol);
+                const canContinueCapture = newCaptures.length > 0;
+                
+                if (canContinueCapture) {
+                    // Продолжаем взятие той же шашкой
+                    selectedChecker = { row: toRow, col: toCol };
+                    availableMoves = newCaptures;
                     
-                    if (canContinueCapture) {
-                        // Продолжаем взятие той же шашкой
-                        selectedChecker = { row: toRow, col: toCol };
-                        availableMoves = newCaptures.filter(capture => 
-                            Math.sign(capture.row - toRow) === Math.sign(move.direction.dr) &&
-                            Math.sign(capture.col - toCol) === Math.sign(move.direction.dc)
-                        );
-                        
-                        updateBoardUI();
-                        highlightAvailableMoves();
+                    updateBoardUI();
+                    highlightAvailableMoves();
+                    
+                    if (currentPlayer === 1) {
                         showNotification('⚠️ Продолжайте взятие!');
-                        return; // Не меняем игрока
+                    } else {
+                        // Для бота - продолжаем автоматически
+                        setTimeout(() => {
+                            makeBotMove();
+                        }, 300);
                     }
-                } else {
-                    // Для обычной шашки проверяем возможность дальнейшего взятия
-                    const newCaptures = getCapturesForChecker(toRow, toCol);
-                    if (newCaptures.length > 0) {
-                        // Продолжаем взятие
-                        selectedChecker = { row: toRow, col: toCol };
-                        availableMoves = newCaptures;
-                        
-                        updateBoardUI();
-                        highlightAvailableMoves();
-                        showNotification('⚠️ Продолжайте взятие!');
-                        return; // Не меняем игрока
-                    }
+                    return; // Не меняем игрока
                 }
             } else {
-                // Обычный ход
                 addMoveToHistory(fromRow, fromCol, toRow, toCol, false);
             }
             
@@ -1368,6 +1397,7 @@
             if (piece === 1 && toRow === 0) {
                 boardState[toRow][toCol] = 3;
                 console.log('👑 Игрок превратился в дамку');
+                showNotification('👑 Ваша шашка стала дамкой!');
             } else if (piece === 2 && toRow === 7) {
                 boardState[toRow][toCol] = 4;
                 console.log('👑 Бот превратился в дамку');
@@ -1377,7 +1407,7 @@
             updateBoardUI();
             clearSelection();
             
-            // Меняем игрока
+            // Меняем игрока ТОЛЬКО если не продолжаем взятие
             currentPlayer = currentPlayer === 1 ? 2 : 1;
             moveCount++;
             updateGameStats();
@@ -1386,7 +1416,7 @@
             console.log('🔄 Смена игрока. Теперь ходит:', currentPlayer === 1 ? 'Игрок' : 'Бот');
             
             // Если теперь ходит бот
-            if (currentPlayer === 2) {
+            if (currentPlayer === 2 && gameActive) {
                 console.log('🤖 Ход бота через 500мс');
                 setTimeout(makeBotMove, 500);
             }
@@ -1891,17 +1921,9 @@
                 const timeString = time.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
                 
                 let senderName = msg.senderName || 'Неизвестный';
-                let senderClass = '';
-                
-                if (msg.senderId === 'system') {
-                    senderClass = 'system';
-                } else if (msg.senderId === currentUser?.uid) {
-                    senderName = 'Вы';
-                    senderClass = 'current-user';
-                }
                 
                 messageDiv.innerHTML = `
-                    <div class="sender ${senderClass}">${senderName}:</div>
+                    <div class="sender">${senderName}:</div>
                     <span>${msg.message || ''}</span>
                     <span class="time">${timeString}</span>
                 `;
@@ -1919,6 +1941,12 @@
             document.getElementById('auth').style.display = 'block';
             document.getElementById('user-info-panel').style.display = 'none';
             document.getElementById('game').style.display = 'none';
+            
+            // Отписываемся от чата при выходе
+            if (chatRef) {
+                chatRef.off('value');
+                chatRef = null;
+            }
         }
         
         function showGameScreen() {
@@ -1927,6 +1955,14 @@
             document.getElementById('game').style.display = 'grid';
             
             updateUserUI();
+            startNewGame();
+            
+            // Подписка на чат
+            chatRef = database.ref('chat').limitToLast(50);
+            chatRef.on('value', (snapshot) => {
+                const messages = snapshot.val();
+                updateChat(messages);
+            });
         }
         
         function updateUserUI() {
@@ -1968,6 +2004,13 @@
         
         async function logout() {
             try {
+                if (currentUser) {
+                    await database.ref('users/' + currentUser.uid).update({
+                        status: 'offline',
+                        lastOnline: firebase.database.ServerValue.TIMESTAMP
+                    });
+                }
+                
                 await auth.signOut();
                 currentUser = null;
                 
