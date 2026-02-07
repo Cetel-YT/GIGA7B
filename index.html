@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Онлайн шашки 4</title>
+    <title>Онлайн шашки</title>
     
     <!-- Firebase SDK -->
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
@@ -1246,10 +1246,17 @@
                     
                     const piece = boardState[row][col];
                     if (piece !== 0) {
+                        // В режиме тумана войны шашки бота создаем всегда, но они будут скрыты классом hidden
                         const checker = document.createElement('div');
                         checker.className = `checker player${piece === 1 || piece === 3 ? '1' : '2'}${piece > 2 ? ' king' : ''}`;
                         checker.dataset.row = row;
                         checker.dataset.col = col;
+                        
+                        // Если это шашка бота и клетка скрыта, добавляем дополнительный класс
+                        if (fogOfWarActive && row < 4 && (piece === 2 || piece === 4)) {
+                            checker.classList.add('hidden-checker');
+                        }
+                        
                         cell.appendChild(checker);
                     }
                     
@@ -1257,7 +1264,115 @@
                 }
             }
             
+            // После создания доски обновляем раскрытые клетки
+            updateRevealedCells();
             updateGameStats();
+        }
+        
+        // ИСПРАВЛЕННАЯ ФУНКЦИЯ: Теперь шашки бота видны в раскрытых зонах
+        function updateBoardUI() {
+            const cells = document.querySelectorAll('.cell');
+            cells.forEach(cell => {
+                const row = parseInt(cell.dataset.row);
+                const col = parseInt(cell.dataset.col);
+                const piece = boardState[row][col];
+                
+                // Удаляем старые шашки
+                const oldChecker = cell.querySelector('.checker');
+                if (oldChecker) {
+                    oldChecker.remove();
+                }
+                
+                // Создаем шашку если она есть
+                if (piece !== 0) {
+                    const checker = document.createElement('div');
+                    checker.className = `checker player${piece === 1 || piece === 3 ? '1' : '2'}${piece > 2 ? ' king' : ''}`;
+                    checker.dataset.row = row;
+                    checker.dataset.col = col;
+                    
+                    // В режиме тумана войны для шашек бота проверяем, раскрыта ли клетка
+                    if (fogOfWarActive && row < 4 && (piece === 2 || piece === 4)) {
+                        if (revealedCells.has(`${row},${col}`)) {
+                            // Клетка раскрыта - показываем шашку
+                            cell.appendChild(checker);
+                        }
+                        // Если клетка не раскрыта - не показываем шашку
+                    } else {
+                        // Все остальные шашки показываем всегда
+                        cell.appendChild(checker);
+                    }
+                }
+            });
+            
+            // Обновляем раскрытые клетки
+            updateRevealedCells();
+        }
+        
+        // ИСПРАВЛЕННАЯ ФУНКЦИЯ: Теперь правильно обновляет видимость клеток
+        function updateRevealedCells() {
+            if (!fogOfWarActive) return;
+            
+            const newRevealedCells = new Set();
+            
+            // Находим все шашки игрока
+            for (let row = 0; row < 8; row++) {
+                for (let col = 0; col < 8; col++) {
+                    if (boardState[row][col] === 1 || boardState[row][col] === 3) {
+                        // Раскрываем клетки вокруг шашки (в радиусе 2 для лучшего обзора)
+                        for (let dr = -2; dr <= 2; dr++) {
+                            for (let dc = -2; dc <= 2; dc++) {
+                                const newRow = row + dr;
+                                const newCol = col + dc;
+                                
+                                if (isValidPosition(newRow, newCol) && newRow < 4) {
+                                    newRevealedCells.add(`${newRow},${newCol}`);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            
+            revealedCells = newRevealedCells;
+            
+            // Обновляем отображение клеток
+            const cells = document.querySelectorAll('.cell[data-hidden="true"]');
+            cells.forEach(cell => {
+                const row = parseInt(cell.dataset.row);
+                const col = parseInt(cell.dataset.col);
+                
+                if (revealedCells.has(`${row},${col}`)) {
+                    // Клетка раскрыта - показываем ее
+                    cell.classList.remove('hidden');
+                    cell.classList.add('revealed');
+                    cell.classList.add((row + col) % 2 === 0 ? 'light' : 'dark');
+                    cell.dataset.hidden = 'false';
+                    
+                    // Также показываем шашку бота, если она есть в этой клетке
+                    const piece = boardState[row][col];
+                    if (piece === 2 || piece === 4) {
+                        // Удаляем старую шашку если есть
+                        const oldChecker = cell.querySelector('.checker');
+                        if (oldChecker) oldChecker.remove();
+                        
+                        // Создаем новую шашку
+                        const checker = document.createElement('div');
+                        checker.className = `checker player${piece === 1 || piece === 3 ? '1' : '2'}${piece > 2 ? ' king' : ''}`;
+                        checker.dataset.row = row;
+                        checker.dataset.col = col;
+                        cell.appendChild(checker);
+                    }
+                } else {
+                    // Клетка скрыта
+                    cell.classList.add('hidden');
+                    cell.classList.remove('revealed', 'light', 'dark');
+                    cell.dataset.hidden = 'true';
+                    
+                    // Скрываем шашку бота если она есть
+                    const oldChecker = cell.querySelector('.checker');
+                    if (oldChecker) oldChecker.remove();
+                }
+            });
         }
         
         function getInitialBoard() {
@@ -1629,78 +1744,6 @@
                     if (move.isCapture) {
                         targetCell.classList.add('capture');
                     }
-                }
-            });
-        }
-        
-        function updateBoardUI() {
-            const cells = document.querySelectorAll('.cell');
-            cells.forEach(cell => {
-                const row = parseInt(cell.dataset.row);
-                const col = parseInt(cell.dataset.col);
-                const piece = boardState[row][col];
-                
-                const oldChecker = cell.querySelector('.checker');
-                if (oldChecker) {
-                    oldChecker.remove();
-                }
-                
-                if (fogOfWarActive && row < 4 && (piece === 2 || piece === 4)) {
-                    if (!revealedCells.has(`${row},${col}`)) {
-                        return;
-                    }
-                }
-                
-                if (piece !== 0) {
-                    const checker = document.createElement('div');
-                    checker.className = `checker player${piece === 1 || piece === 3 ? '1' : '2'}${piece > 2 ? ' king' : ''}`;
-                    checker.dataset.row = row;
-                    checker.dataset.col = col;
-                    cell.appendChild(checker);
-                }
-            });
-            
-            updateRevealedCells();
-        }
-        
-        function updateRevealedCells() {
-            if (!fogOfWarActive) return;
-            
-            const newRevealedCells = new Set();
-            
-            for (let row = 0; row < 8; row++) {
-                for (let col = 0; col < 8; col++) {
-                    if (boardState[row][col] === 1 || boardState[row][col] === 3) {
-                        for (let dr = -1; dr <= 1; dr++) {
-                            for (let dc = -1; dc <= 1; dc++) {
-                                const newRow = row + dr;
-                                const newCol = col + dc;
-                                
-                                if (isValidPosition(newRow, newCol) && newRow < 4) {
-                                    newRevealedCells.add(`${newRow},${newCol}`);
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-            
-            revealedCells = newRevealedCells;
-            
-            const cells = document.querySelectorAll('.cell[data-hidden="true"]');
-            cells.forEach(cell => {
-                const row = parseInt(cell.dataset.row);
-                const col = parseInt(cell.dataset.col);
-                
-                if (revealedCells.has(`${row},${col}`)) {
-                    cell.classList.remove('hidden');
-                    cell.classList.add('revealed');
-                    cell.classList.add((row + col) % 2 === 0 ? 'light' : 'dark');
-                    cell.dataset.hidden = 'false';
-                } else {
-                    cell.classList.add('hidden');
-                    cell.classList.remove('revealed', 'light', 'dark');
-                    cell.dataset.hidden = 'true';
                 }
             });
         }
@@ -2354,6 +2397,11 @@
                 5. Дамка может бить на любое расстояние
                 6. При достижении последней горизонтали шашка становится дамкой
                 7. При взятии можно продолжать бить дальше
+                
+                Особенности режима "Туман войны":
+                - Половина доски соперника скрыта туманом
+                - Шашки соперника видны только в радиусе 2 клеток от ваших шашек
+                - Когда вы приближаетесь к шашке противника, она становится видимой
                 
                 Удачи в игре! 🎮
             `;
