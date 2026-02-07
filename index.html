@@ -11,7 +11,6 @@
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
     
     <style>
-        /* Все стили остаются прежними */
         * {
             margin: 0;
             padding: 0;
@@ -735,8 +734,7 @@
         <button onclick="debugTestOnline()">Тест онлайн</button>
         <button onclick="debugTestGames()">Тест игр</button>
         <button onclick="debugShowData()">Данные</button>
-        <button onclick="debugSendTestMessage()">Тест сообщение</button>
-        <button onclick="debugForceRefresh()">Обновить данные</button>
+        <button onclick="debugTestMove()">Тест хода</button>
     </div>
     
     <div class="container">
@@ -1012,16 +1010,12 @@
             showAuthMessage('Регистрация...', 'info');
             
             try {
-                // Создаем email из имени пользователя
                 const email = username.toLowerCase() + '@checkers.game';
-                
-                // Регистрируем пользователя в Firebase Auth
                 const userCredential = await auth.createUserWithEmailAndPassword(email, password);
                 const userId = userCredential.user.uid;
                 
                 console.log('✅ Пользователь создан:', userId);
                 
-                // Создаем профиль в базе данных
                 const userData = {
                     username: username,
                     email: email,
@@ -1036,16 +1030,12 @@
                 
                 await database.ref('users/' + userId).set(userData);
                 
-                // Загружаем данные пользователя
                 currentUser = {
                     uid: userId,
                     ...userData
                 };
                 
-                // Настраиваем онлайн статус
                 await setupOnlinePresence(userId);
-                
-                // Настраиваем слушателей Firebase
                 setupFirebaseListeners();
                 
                 showGameScreen();
@@ -1076,7 +1066,6 @@
                 
                 console.log('✅ Пользователь вошел:', userId);
                 
-                // Загружаем данные пользователя
                 await loadUserData(userId);
                 
             } catch (error) {
@@ -1096,16 +1085,12 @@
                         ...userData
                     };
                     
-                    // Обновляем онлайн статус
                     await database.ref('users/' + userId).update({
                         lastOnline: firebase.database.ServerValue.TIMESTAMP,
                         status: 'online'
                     });
                     
-                    // Настраиваем онлайн статус
                     await setupOnlinePresence(userId);
-                    
-                    // Настраиваем слушателей Firebase
                     setupFirebaseListeners();
                     
                     updateUserUI();
@@ -1120,16 +1105,13 @@
         
         async function setupOnlinePresence(userId) {
             try {
-                // Создаем запись онлайн статуса
                 userStatusRef = database.ref('status/' + userId);
                 
-                // Настраиваем отключение
                 userStatusRef.onDisconnect().set({
                     status: 'offline',
                     lastOnline: firebase.database.ServerValue.TIMESTAMP
                 });
                 
-                // Устанавливаем онлайн статус
                 await userStatusRef.set({
                     status: 'online',
                     lastOnline: firebase.database.ServerValue.TIMESTAMP,
@@ -1153,7 +1135,6 @@
             
             console.log('🔄 Настройка слушателей Firebase для пользователя:', currentUser.uid);
             
-            // Удаляем старые слушатели, если они есть
             removeFirebaseListeners();
             
             // Слушаем изменения статусов пользователей
@@ -1215,7 +1196,6 @@
         function removeFirebaseListeners() {
             console.log('🔄 Удаление старых слушателей Firebase...');
             
-            // Удаляем слушателей
             if (usersListener) {
                 database.ref('status').off('value', usersListener);
                 usersListener = null;
@@ -1236,7 +1216,6 @@
                 invitationsListener = null;
             }
             
-            // Удаляем слушатели игр
             for (const gameId in gameListeners) {
                 if (gameListeners[gameId]) {
                     database.ref('games/' + gameId).off('value', gameListeners[gameId]);
@@ -1249,16 +1228,13 @@
             const usersList = document.getElementById('users-list');
             const onlineCount = document.getElementById('online-count');
             
-            if (!usersList) {
-                console.log('❌ Элемент users-list не найден');
-                return;
-            }
+            if (!usersList) return;
             
             usersList.innerHTML = '';
             
             let onlineUserCount = 0;
             
-            // Сначала добавляем текущего пользователя
+            // Текущий пользователь
             if (currentUser) {
                 const userItem = document.createElement('div');
                 userItem.className = 'user-item current-user online';
@@ -1274,11 +1250,10 @@
                 onlineUserCount++;
             }
             
-            // Добавляем других пользователей
+            // Другие пользователи
             for (const userId in onlineUsers) {
                 const userStatus = onlineUsers[userId];
                 
-                // Пропускаем текущего пользователя и оффлайн пользователей
                 if (userId === currentUser?.uid || userStatus.status !== 'online') {
                     continue;
                 }
@@ -1301,12 +1276,10 @@
                 usersList.appendChild(userItem);
             }
             
-            // Обновляем счетчик онлайн
             if (onlineCount) {
                 onlineCount.textContent = `(${onlineUserCount})`;
             }
             
-            // Если нет других пользователей
             if (onlineUserCount <= 1) {
                 const emptyItem = document.createElement('div');
                 emptyItem.className = 'user-item';
@@ -1325,10 +1298,7 @@
         function updateGamesList() {
             const gamesList = document.getElementById('online-games-list');
             
-            if (!gamesList) {
-                console.log('❌ Элемент online-games-list не найден');
-                return;
-            }
+            if (!gamesList) return;
             
             gamesList.innerHTML = '';
             
@@ -1337,7 +1307,6 @@
             for (const gameId in waitingGames) {
                 const game = waitingGames[gameId];
                 
-                // Пропускаем свои собственные игры
                 if (game.player1 === currentUser?.uid) {
                     continue;
                 }
@@ -1361,378 +1330,10 @@
             if (!hasGames) {
                 gamesList.innerHTML = '<p id="no-games-message">Нет доступных игр. Создайте свою!</p>';
             }
-            
-            console.log(`🎮 Отображено игр: ${hasGames ? Object.keys(waitingGames).length - (currentUser ? 1 : 0) : 0}`);
-        }
-        
-        async function createOnlineGame() {
-            if (!currentUser) {
-                showNotification('⚠️ Сначала войдите в систему');
-                return;
-            }
-            
-            try {
-                const gameRef = database.ref('games').push();
-                const gameId = gameRef.key;
-                
-                const gameData = {
-                    gameId: gameId,
-                    player1: currentUser.uid,
-                    player1Name: currentUser.username,
-                    player1Rating: currentUser.rating || 1000,
-                    player2: null,
-                    player2Name: null,
-                    player2Rating: null,
-                    status: 'waiting',
-                    currentPlayer: 1,
-                    board: getInitialBoard(),
-                    createdAt: firebase.database.ServerValue.TIMESTAMP,
-                    lastMove: null
-                };
-                
-                await gameRef.set(gameData);
-                
-                // Подписываемся на обновления игры
-                setupGameListener(gameId);
-                
-                showNotification('✅ Игра создана! Ожидайте соперника...');
-                
-                // Обновляем список игр
-                refreshGamesList();
-                
-            } catch (error) {
-                console.error('❌ Ошибка создания игры:', error);
-                showNotification('❌ Ошибка создания игры');
-            }
-        }
-        
-        async function joinOnlineGame(gameId) {
-            if (!currentUser) {
-                showNotification('⚠️ Сначала войдите в систему');
-                return;
-            }
-            
-            try {
-                const gameRef = database.ref('games/' + gameId);
-                const snapshot = await gameRef.once('value');
-                const game = snapshot.val();
-                
-                if (!game) {
-                    showNotification('⚠️ Игра не найдена');
-                    return;
-                }
-                
-                if (game.status !== 'waiting') {
-                    showNotification('⚠️ Игра уже начата');
-                    return;
-                }
-                
-                if (game.player1 === currentUser.uid) {
-                    showNotification('⚠️ Это ваша собственная игра');
-                    return;
-                }
-                
-                // Обновляем данные игры
-                await gameRef.update({
-                    player2: currentUser.uid,
-                    player2Name: currentUser.username,
-                    player2Rating: currentUser.rating || 1000,
-                    status: 'active',
-                    startedAt: firebase.database.ServerValue.TIMESTAMP
-                });
-                
-                // Подписываемся на обновления игры
-                setupGameListener(gameId);
-                
-                // Начинаем игру
-                currentGame = gameId;
-                gameMode = 'online';
-                setGameMode('online');
-                
-                showNotification('✅ Вы присоединились к игре! Начинаем...');
-                
-            } catch (error) {
-                console.error('❌ Ошибка присоединения к игре:', error);
-                showNotification('❌ Ошибка присоединения к игре');
-            }
-        }
-        
-        function setupGameListener(gameId) {
-            // Удаляем предыдущий слушатель, если есть
-            if (gameListeners[gameId]) {
-                database.ref('games/' + gameId).off('value', gameListeners[gameId]);
-            }
-            
-            // Устанавливаем новый слушатель
-            gameListeners[gameId] = database.ref('games/' + gameId).on('value', (snapshot) => {
-                const game = snapshot.val();
-                if (!game) {
-                    console.log('❌ Игра удалена');
-                    return;
-                }
-                
-                currentGame = gameId;
-                console.log('🎮 Обновление игры:', gameId, 'Статус:', game.status);
-                
-                // Обновляем интерфейс игры
-                updateGameUI(game);
-                
-                // Если игра активна
-                if (game.status === 'active') {
-                    // Загружаем доску
-                    if (game.board) {
-                        loadBoardFromFirebase(game.board);
-                        boardState = game.board;
-                    }
-                    
-                    // Обновляем информацию о игроках
-                    document.getElementById('player1-name').textContent = game.player1Name || 'Игрок 1';
-                    document.getElementById('player2-name').textContent = game.player2Name || 'Игрок 2';
-                    document.getElementById('player1-rating').textContent = `Рейтинг: ${game.player1Rating || 1000}`;
-                    document.getElementById('player2-rating').textContent = `Рейтинг: ${game.player2Rating || 1000}`;
-                    
-                    // Обновляем текущего игрока
-                    currentPlayer = game.currentPlayer || 1;
-                    updatePlayerCards();
-                    
-                    // Обновляем статус игры
-                    let statusText = '';
-                    if (currentUser.uid === game.player1) {
-                        statusText = currentPlayer === 1 ? 'Ваш ход!' : 'Ход соперника...';
-                    } else if (currentUser.uid === game.player2) {
-                        statusText = currentPlayer === 2 ? 'Ваш ход!' : 'Ход соперника...';
-                    }
-                    document.getElementById('game-status').textContent = statusText;
-                    
-                    gameActive = true;
-                }
-            }, (error) => {
-                console.error('❌ Ошибка слушателя игры:', error);
-            });
-        }
-        
-        async function makeOnlineMove(fromRow, fromCol, toRow, toCol) {
-            if (!currentGame || !currentUser) return;
-            
-            try {
-                const gameRef = database.ref('games/' + currentGame);
-                const snapshot = await gameRef.once('value');
-                const game = snapshot.val();
-                
-                if (!game || game.status !== 'active') return;
-                
-                // Проверяем, чей сейчас ход
-                const isPlayer1 = currentUser.uid === game.player1;
-                const isPlayer2 = currentUser.uid === game.player2;
-                
-                if ((isPlayer1 && game.currentPlayer !== 1) || (isPlayer2 && game.currentPlayer !== 2)) {
-                    showNotification('⚠️ Сейчас не ваш ход!');
-                    return;
-                }
-                
-                // Обновляем доску
-                const newBoard = [...game.board];
-                const piece = newBoard[fromRow][fromCol];
-                newBoard[fromRow][fromCol] = 0;
-                newBoard[toRow][toCol] = piece;
-                
-                // Проверяем на превращение в дамку
-                if (piece === 1 && toRow === 0) {
-                    newBoard[toRow][toCol] = 3; // Дамка игрока 1
-                } else if (piece === 2 && toRow === 7) {
-                    newBoard[toRow][toCol] = 4; // Дамка игрока 2
-                }
-                
-                // Меняем игрока
-                const nextPlayer = game.currentPlayer === 1 ? 2 : 1;
-                
-                await gameRef.update({
-                    board: newBoard,
-                    currentPlayer: nextPlayer,
-                    lastMove: {
-                        from: { row: fromRow, col: fromCol },
-                        to: { row: toRow, col: toCol },
-                        player: game.currentPlayer,
-                        timestamp: firebase.database.ServerValue.TIMESTAMP
-                    }
-                });
-                
-            } catch (error) {
-                console.error('❌ Ошибка хода:', error);
-                showNotification('❌ Ошибка выполнения хода');
-            }
-        }
-        
-        function inviteToGame(userId, username) {
-            if (!currentUser) return;
-            
-            // Создаем приглашение
-            const invitationRef = database.ref('invitations').push();
-            invitationRef.set({
-                from: currentUser.uid,
-                fromName: currentUser.username,
-                to: userId,
-                toName: username,
-                status: 'pending',
-                createdAt: firebase.database.ServerValue.TIMESTAMP
-            }).then(() => {
-                showNotification(`📨 Приглашение отправлено ${username}`);
-            }).catch((error) => {
-                console.error('❌ Ошибка отправки приглашения:', error);
-                showNotification('❌ Ошибка отправки приглашения');
-            });
-        }
-        
-        function handleInvitations(invitations) {
-            for (const inviteId in invitations) {
-                const invite = invitations[inviteId];
-                
-                if (invite.status === 'pending') {
-                    const accept = confirm(`${invite.fromName} приглашает вас в игру. Принять приглашение?`);
-                    
-                    if (accept) {
-                        // Принимаем приглашение
-                        database.ref('invitations/' + inviteId).update({ status: 'accepted' });
-                        
-                        // Создаем игру
-                        createOnlineGameWithFriend(invite.from);
-                        
-                    } else {
-                        // Отклоняем приглашение
-                        database.ref('invitations/' + inviteId).update({ status: 'rejected' });
-                    }
-                }
-            }
-        }
-        
-        async function createOnlineGameWithFriend(friendId) {
-            try {
-                const gameRef = database.ref('games').push();
-                const gameId = gameRef.key;
-                
-                // Получаем данные друга
-                const friendSnapshot = await database.ref('users/' + friendId).once('value');
-                const friendData = friendSnapshot.val();
-                
-                const gameData = {
-                    gameId: gameId,
-                    player1: currentUser.uid,
-                    player1Name: currentUser.username,
-                    player1Rating: currentUser.rating || 1000,
-                    player2: friendId,
-                    player2Name: friendData?.username || 'Друг',
-                    player2Rating: friendData?.rating || 1000,
-                    status: 'active',
-                    currentPlayer: 1,
-                    board: getInitialBoard(),
-                    createdAt: firebase.database.ServerValue.TIMESTAMP,
-                    startedAt: firebase.database.ServerValue.TIMESTAMP,
-                    lastMove: null
-                };
-                
-                await gameRef.set(gameData);
-                
-                // Подписываемся на обновления игры
-                setupGameListener(gameId);
-                
-                showNotification('✅ Игра с другом создана!');
-                
-            } catch (error) {
-                console.error('❌ Ошибка создания игры с другом:', error);
-                showNotification('❌ Ошибка создания игры');
-            }
         }
         
         // ====================================================
-        // ЧАТ
-        // ====================================================
-        async function sendMessage() {
-            const messageInput = document.getElementById('message');
-            const message = messageInput.value.trim();
-            
-            if (!message) {
-                showNotification('⚠️ Введите сообщение');
-                return;
-            }
-            
-            if (!currentUser) {
-                showNotification('⚠️ Сначала войдите в систему');
-                return;
-            }
-            
-            if (message.length > 200) {
-                showNotification('⚠️ Сообщение слишком длинное (макс. 200 символов)');
-                return;
-            }
-            
-            try {
-                await database.ref('chat').push().set({
-                    senderId: currentUser.uid,
-                    senderName: currentUser.username,
-                    message: message,
-                    timestamp: firebase.database.ServerValue.TIMESTAMP,
-                    type: 'user'
-                });
-                
-                messageInput.value = '';
-                messageInput.focus();
-                
-            } catch (error) {
-                console.error('❌ Ошибка отправки сообщения:', error);
-                showNotification('❌ Ошибка отправки сообщения');
-            }
-        }
-        
-        function updateChat(messages) {
-            const chatMessages = document.getElementById('chat-messages');
-            if (!chatMessages) {
-                console.log('❌ Элемент chat-messages не найден');
-                return;
-            }
-            
-            // Преобразуем объект в массив
-            const messagesArray = Object.entries(messages || {})
-                .map(([id, msg]) => ({ id, ...msg }))
-                .sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
-            
-            // Очищаем чат
-            chatMessages.innerHTML = '';
-            
-            // Добавляем сообщения
-            messagesArray.forEach(msg => {
-                const messageDiv = document.createElement('div');
-                messageDiv.className = 'message';
-                
-                const time = msg.timestamp ? new Date(msg.timestamp) : new Date();
-                const timeString = time.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-                
-                let senderName = msg.senderName || 'Неизвестный';
-                let senderClass = '';
-                
-                if (msg.senderId === 'system') {
-                    senderClass = 'system';
-                } else if (msg.senderId === currentUser?.uid) {
-                    senderName = 'Вы';
-                    senderClass = 'current-user';
-                }
-                
-                messageDiv.innerHTML = `
-                    <div class="sender ${senderClass}">${senderName}:</div>
-                    <span>${msg.message || ''}</span>
-                    <span class="time">${timeString}</span>
-                `;
-                
-                chatMessages.appendChild(messageDiv);
-            });
-            
-            // Прокручиваем вниз
-            chatMessages.scrollTop = chatMessages.scrollHeight;
-            
-            console.log(`💬 Отображено сообщений: ${messagesArray.length}`);
-        }
-        
-        // ====================================================
-        // ИГРОВАЯ ЛОГИКА (ОСТАЕТСЯ БЕЗ ИЗМЕНЕНИЙ)
+        // ИГРОВАЯ ЛОГИКА - ИСПРАВЛЕННАЯ ВЕРСИЯ
         // ====================================================
         function initBoard() {
             const board = document.getElementById('board');
@@ -1747,7 +1348,12 @@
                     cell.dataset.row = row;
                     cell.dataset.col = col;
                     
-                    cell.addEventListener('click', () => handleCellClick(row, col));
+                    // Исправленный обработчик клика
+                    cell.addEventListener('click', function() {
+                        const row = parseInt(this.dataset.row);
+                        const col = parseInt(this.dataset.col);
+                        handleCellClick(row, col);
+                    });
                     
                     const piece = boardState[row][col];
                     if (piece !== 0) {
@@ -1787,50 +1393,29 @@
             return board;
         }
         
-        function loadBoardFromFirebase(firebaseBoard) {
-            if (!firebaseBoard) return;
-            
-            boardState = firebaseBoard;
-            updateBoardUI();
-        }
-        
-        function updateBoardUI() {
-            const cells = document.querySelectorAll('.cell');
-            cells.forEach(cell => {
-                const row = parseInt(cell.dataset.row);
-                const col = parseInt(cell.dataset.col);
-                const piece = boardState[row][col];
-                
-                // Удаляем старые шашки
-                const oldChecker = cell.querySelector('.checker');
-                if (oldChecker) {
-                    oldChecker.remove();
-                }
-                
-                // Добавляем новые шашки
-                if (piece !== 0) {
-                    const checker = document.createElement('div');
-                    checker.className = `checker player${piece === 1 || piece === 3 ? '1' : '2'}${piece > 2 ? ' king' : ''}`;
-                    checker.dataset.row = row;
-                    checker.dataset.col = col;
-                    cell.appendChild(checker);
-                }
-            });
-        }
-        
         function handleCellClick(row, col) {
-            if (!gameActive) return;
+            console.log('🖱️ Клик по клетке:', row, col, 'gameActive:', gameActive);
+            
+            if (!gameActive) {
+                console.log('⚠️ Игра не активна');
+                return;
+            }
             
             const piece = boardState[row][col];
+            console.log('🔍 Клетка содержит:', piece, 'Текущий игрок:', currentPlayer);
             
             // Если выбрана шашка текущего игрока
             if ((currentPlayer === 1 && (piece === 1 || piece === 3)) || 
                 (currentPlayer === 2 && (piece === 2 || piece === 4))) {
+                console.log('✅ Выбрана шашка игрока', currentPlayer);
                 selectChecker(row, col);
             }
             // Если выбрана доступная клетка для хода
             else if (selectedChecker && isAvailableMove(row, col)) {
+                console.log('✅ Ход на клетку:', row, col);
                 makeMove(row, col);
+            } else {
+                console.log('❌ Недопустимый ход или клетка');
             }
         }
         
@@ -1839,6 +1424,8 @@
             
             selectedChecker = { row, col };
             availableMoves = getAvailableMoves(row, col);
+            
+            console.log('🎯 Выбрана шашка:', row, col, 'Доступные ходы:', availableMoves.length);
             
             // Подсвечиваем выбранную шашку
             const cell = document.querySelector(`.cell[data-row="${row}"][data-col="${col}"]`);
@@ -1949,6 +1536,8 @@
             const { row: fromRow, col: fromCol } = selectedChecker;
             const piece = boardState[fromRow][fromCol];
             
+            console.log('🎮 Ход:', fromRow, fromCol, '->', toRow, toCol, 'Фигура:', piece);
+            
             // Обновляем состояние доски
             boardState[fromRow][fromCol] = 0;
             boardState[toRow][toCol] = piece;
@@ -1956,13 +1545,16 @@
             // Если было взятие, удаляем шашку соперника
             if (move.isCapture) {
                 boardState[move.captureRow][move.captureCol] = 0;
+                console.log('🎯 Взятие фигуры на:', move.captureRow, move.captureCol);
             }
             
             // Проверяем превращение в дамку
             if (piece === 1 && toRow === 0) {
                 boardState[toRow][toCol] = 3;
+                console.log('👑 Игрок 1 превратился в дамку');
             } else if (piece === 2 && toRow === 7) {
                 boardState[toRow][toCol] = 4;
+                console.log('👑 Игрок 2 превратился в дамку');
             }
             
             // Обновляем UI
@@ -1971,14 +1563,17 @@
             
             // Если онлайн игра, отправляем ход на сервер
             if (gameMode === 'online' && currentGame) {
+                console.log('🌐 Отправка хода в онлайн игру');
                 makeOnlineMove(fromRow, fromCol, toRow, toCol);
             } else {
                 // Меняем игрока
                 currentPlayer = currentPlayer === 1 ? 2 : 1;
+                console.log('🔄 Смена игрока. Теперь ходит:', currentPlayer);
                 updatePlayerCards();
                 
                 // Если игра против бота
                 if (gameMode === 'bot' && currentPlayer === 2) {
+                    console.log('🤖 Ход бота через 500мс');
                     setTimeout(makeBotMove, 500);
                 }
             }
@@ -1987,10 +1582,38 @@
             checkGameEnd();
         }
         
+        function updateBoardUI() {
+            const cells = document.querySelectorAll('.cell');
+            cells.forEach(cell => {
+                const row = parseInt(cell.dataset.row);
+                const col = parseInt(cell.dataset.col);
+                const piece = boardState[row][col];
+                
+                // Удаляем старые шашки
+                const oldChecker = cell.querySelector('.checker');
+                if (oldChecker) {
+                    oldChecker.remove();
+                }
+                
+                // Добавляем новые шашки
+                if (piece !== 0) {
+                    const checker = document.createElement('div');
+                    checker.className = `checker player${piece === 1 || piece === 3 ? '1' : '2'}${piece > 2 ? ' king' : ''}`;
+                    checker.dataset.row = row;
+                    checker.dataset.col = col;
+                    cell.appendChild(checker);
+                }
+            });
+        }
+        
         function makeBotMove() {
-            if (!gameActive || currentPlayer !== 2 || botThinking) return;
+            if (!gameActive || currentPlayer !== 2 || botThinking) {
+                console.log('🤖 Бот не может ходить: gameActive=', gameActive, 'currentPlayer=', currentPlayer, 'botThinking=', botThinking);
+                return;
+            }
             
             botThinking = true;
+            console.log('🤖 Бот начинает думать...');
             
             const difficulty = document.getElementById('botDifficulty').value;
             
@@ -2011,12 +1634,15 @@
                 }
             }
             
+            console.log('🤖 Все возможные ходы бота:', allMoves.length);
+            
             if (allMoves.length === 0) {
+                console.log('🤖 У бота нет возможных ходов');
                 botThinking = false;
                 return;
             }
             
-            // Выбираем ход
+            // Выбираем ход в зависимости от сложности
             let selectedMove;
             if (difficulty === 'easy') {
                 selectedMove = allMoves[Math.floor(Math.random() * allMoves.length)];
@@ -2040,11 +1666,15 @@
                 }
             }
             
+            console.log('🤖 Бот выбрал ход:', selectedMove);
+            
+            // Выполняем ход с задержкой для реалистичности
             setTimeout(() => {
                 selectChecker(selectedMove.from.row, selectedMove.from.col);
                 setTimeout(() => {
                     makeMove(selectedMove.to.row, selectedMove.to.col);
                     botThinking = false;
+                    console.log('🤖 Бот завершил ход');
                 }, 300);
             }, 500);
         }
@@ -2089,12 +1719,351 @@
         }
         
         // ====================================================
+        // ОНЛАЙН ИГРА
+        // ====================================================
+        async function createOnlineGame() {
+            if (!currentUser) {
+                showNotification('⚠️ Сначала войдите в систему');
+                return;
+            }
+            
+            try {
+                const gameRef = database.ref('games').push();
+                const gameId = gameRef.key;
+                
+                const gameData = {
+                    gameId: gameId,
+                    player1: currentUser.uid,
+                    player1Name: currentUser.username,
+                    player1Rating: currentUser.rating || 1000,
+                    player2: null,
+                    player2Name: null,
+                    player2Rating: null,
+                    status: 'waiting',
+                    currentPlayer: 1,
+                    board: getInitialBoard(),
+                    createdAt: firebase.database.ServerValue.TIMESTAMP,
+                    lastMove: null
+                };
+                
+                await gameRef.set(gameData);
+                
+                setupGameListener(gameId);
+                
+                showNotification('✅ Игра создана! Ожидайте соперника...');
+                
+                refreshGamesList();
+                
+            } catch (error) {
+                console.error('❌ Ошибка создания игры:', error);
+                showNotification('❌ Ошибка создания игры');
+            }
+        }
+        
+        async function joinOnlineGame(gameId) {
+            if (!currentUser) {
+                showNotification('⚠️ Сначала войдите в систему');
+                return;
+            }
+            
+            try {
+                const gameRef = database.ref('games/' + gameId);
+                const snapshot = await gameRef.once('value');
+                const game = snapshot.val();
+                
+                if (!game) {
+                    showNotification('⚠️ Игра не найдена');
+                    return;
+                }
+                
+                if (game.status !== 'waiting') {
+                    showNotification('⚠️ Игра уже начата');
+                    return;
+                }
+                
+                if (game.player1 === currentUser.uid) {
+                    showNotification('⚠️ Это ваша собственная игра');
+                    return;
+                }
+                
+                await gameRef.update({
+                    player2: currentUser.uid,
+                    player2Name: currentUser.username,
+                    player2Rating: currentUser.rating || 1000,
+                    status: 'active',
+                    startedAt: firebase.database.ServerValue.TIMESTAMP
+                });
+                
+                setupGameListener(gameId);
+                
+                currentGame = gameId;
+                gameMode = 'online';
+                setGameMode('online');
+                
+                showNotification('✅ Вы присоединились к игре! Начинаем...');
+                
+            } catch (error) {
+                console.error('❌ Ошибка присоединения к игре:', error);
+                showNotification('❌ Ошибка присоединения к игре');
+            }
+        }
+        
+        function setupGameListener(gameId) {
+            if (gameListeners[gameId]) {
+                database.ref('games/' + gameId).off('value', gameListeners[gameId]);
+            }
+            
+            gameListeners[gameId] = database.ref('games/' + gameId).on('value', (snapshot) => {
+                const game = snapshot.val();
+                if (!game) {
+                    console.log('❌ Игра удалена');
+                    return;
+                }
+                
+                currentGame = gameId;
+                console.log('🎮 Обновление игры:', gameId, 'Статус:', game.status);
+                
+                if (game.status === 'active') {
+                    if (game.board) {
+                        loadBoardFromFirebase(game.board);
+                        boardState = game.board;
+                    }
+                    
+                    document.getElementById('player1-name').textContent = game.player1Name || 'Игрок 1';
+                    document.getElementById('player2-name').textContent = game.player2Name || 'Игрок 2';
+                    document.getElementById('player1-rating').textContent = `Рейтинг: ${game.player1Rating || 1000}`;
+                    document.getElementById('player2-rating').textContent = `Рейтинг: ${game.player2Rating || 1000}`;
+                    
+                    currentPlayer = game.currentPlayer || 1;
+                    updatePlayerCards();
+                    
+                    let statusText = '';
+                    if (currentUser.uid === game.player1) {
+                        statusText = currentPlayer === 1 ? 'Ваш ход!' : 'Ход соперника...';
+                    } else if (currentUser.uid === game.player2) {
+                        statusText = currentPlayer === 2 ? 'Ваш ход!' : 'Ход соперника...';
+                    }
+                    document.getElementById('game-status').textContent = statusText;
+                    
+                    gameActive = true;
+                }
+            }, (error) => {
+                console.error('❌ Ошибка слушателя игры:', error);
+            });
+        }
+        
+        function loadBoardFromFirebase(firebaseBoard) {
+            if (!firebaseBoard) return;
+            
+            boardState = firebaseBoard;
+            updateBoardUI();
+        }
+        
+        async function makeOnlineMove(fromRow, fromCol, toRow, toCol) {
+            if (!currentGame || !currentUser) return;
+            
+            try {
+                const gameRef = database.ref('games/' + currentGame);
+                const snapshot = await gameRef.once('value');
+                const game = snapshot.val();
+                
+                if (!game || game.status !== 'active') return;
+                
+                const isPlayer1 = currentUser.uid === game.player1;
+                const isPlayer2 = currentUser.uid === game.player2;
+                
+                if ((isPlayer1 && game.currentPlayer !== 1) || (isPlayer2 && game.currentPlayer !== 2)) {
+                    showNotification('⚠️ Сейчас не ваш ход!');
+                    return;
+                }
+                
+                const newBoard = [...game.board];
+                const piece = newBoard[fromRow][fromCol];
+                newBoard[fromRow][fromCol] = 0;
+                newBoard[toRow][toCol] = piece;
+                
+                if (piece === 1 && toRow === 0) {
+                    newBoard[toRow][toCol] = 3;
+                } else if (piece === 2 && toRow === 7) {
+                    newBoard[toRow][toCol] = 4;
+                }
+                
+                const nextPlayer = game.currentPlayer === 1 ? 2 : 1;
+                
+                await gameRef.update({
+                    board: newBoard,
+                    currentPlayer: nextPlayer,
+                    lastMove: {
+                        from: { row: fromRow, col: fromCol },
+                        to: { row: toRow, col: toCol },
+                        player: game.currentPlayer,
+                        timestamp: firebase.database.ServerValue.TIMESTAMP
+                    }
+                });
+                
+            } catch (error) {
+                console.error('❌ Ошибка хода:', error);
+                showNotification('❌ Ошибка выполнения хода');
+            }
+        }
+        
+        function inviteToGame(userId, username) {
+            if (!currentUser) return;
+            
+            const invitationRef = database.ref('invitations').push();
+            invitationRef.set({
+                from: currentUser.uid,
+                fromName: currentUser.username,
+                to: userId,
+                toName: username,
+                status: 'pending',
+                createdAt: firebase.database.ServerValue.TIMESTAMP
+            }).then(() => {
+                showNotification(`📨 Приглашение отправлено ${username}`);
+            }).catch((error) => {
+                console.error('❌ Ошибка отправки приглашения:', error);
+                showNotification('❌ Ошибка отправки приглашения');
+            });
+        }
+        
+        function handleInvitations(invitations) {
+            for (const inviteId in invitations) {
+                const invite = invitations[inviteId];
+                
+                if (invite.status === 'pending') {
+                    const accept = confirm(`${invite.fromName} приглашает вас в игру. Принять приглашение?`);
+                    
+                    if (accept) {
+                        database.ref('invitations/' + inviteId).update({ status: 'accepted' });
+                        createOnlineGameWithFriend(invite.from);
+                    } else {
+                        database.ref('invitations/' + inviteId).update({ status: 'rejected' });
+                    }
+                }
+            }
+        }
+        
+        async function createOnlineGameWithFriend(friendId) {
+            try {
+                const gameRef = database.ref('games').push();
+                const gameId = gameRef.key;
+                
+                const friendSnapshot = await database.ref('users/' + friendId).once('value');
+                const friendData = friendSnapshot.val();
+                
+                const gameData = {
+                    gameId: gameId,
+                    player1: currentUser.uid,
+                    player1Name: currentUser.username,
+                    player1Rating: currentUser.rating || 1000,
+                    player2: friendId,
+                    player2Name: friendData?.username || 'Друг',
+                    player2Rating: friendData?.rating || 1000,
+                    status: 'active',
+                    currentPlayer: 1,
+                    board: getInitialBoard(),
+                    createdAt: firebase.database.ServerValue.TIMESTAMP,
+                    startedAt: firebase.database.ServerValue.TIMESTAMP,
+                    lastMove: null
+                };
+                
+                await gameRef.set(gameData);
+                
+                setupGameListener(gameId);
+                
+                showNotification('✅ Игра с другом создана!');
+                
+            } catch (error) {
+                console.error('❌ Ошибка создания игры с другом:', error);
+                showNotification('❌ Ошибка создания игры');
+            }
+        }
+        
+        // ====================================================
+        // ЧАТ
+        // ====================================================
+        async function sendMessage() {
+            const messageInput = document.getElementById('message');
+            const message = messageInput.value.trim();
+            
+            if (!message) {
+                showNotification('⚠️ Введите сообщение');
+                return;
+            }
+            
+            if (!currentUser) {
+                showNotification('⚠️ Сначала войдите в систему');
+                return;
+            }
+            
+            if (message.length > 200) {
+                showNotification('⚠️ Сообщение слишком длинное (макс. 200 символов)');
+                return;
+            }
+            
+            try {
+                await database.ref('chat').push().set({
+                    senderId: currentUser.uid,
+                    senderName: currentUser.username,
+                    message: message,
+                    timestamp: firebase.database.ServerValue.TIMESTAMP,
+                    type: 'user'
+                });
+                
+                messageInput.value = '';
+                messageInput.focus();
+                
+            } catch (error) {
+                console.error('❌ Ошибка отправки сообщения:', error);
+                showNotification('❌ Ошибка отправки сообщения');
+            }
+        }
+        
+        function updateChat(messages) {
+            const chatMessages = document.getElementById('chat-messages');
+            if (!chatMessages) return;
+            
+            const messagesArray = Object.entries(messages || {})
+                .map(([id, msg]) => ({ id, ...msg }))
+                .sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
+            
+            chatMessages.innerHTML = '';
+            
+            messagesArray.forEach(msg => {
+                const messageDiv = document.createElement('div');
+                messageDiv.className = 'message';
+                
+                const time = msg.timestamp ? new Date(msg.timestamp) : new Date();
+                const timeString = time.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                
+                let senderName = msg.senderName || 'Неизвестный';
+                let senderClass = '';
+                
+                if (msg.senderId === 'system') {
+                    senderClass = 'system';
+                } else if (msg.senderId === currentUser?.uid) {
+                    senderName = 'Вы';
+                    senderClass = 'current-user';
+                }
+                
+                messageDiv.innerHTML = `
+                    <div class="sender ${senderClass}">${senderName}:</div>
+                    <span>${msg.message || ''}</span>
+                    <span class="time">${timeString}</span>
+                `;
+                
+                chatMessages.appendChild(messageDiv);
+            });
+            
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        }
+        
+        // ====================================================
         // УПРАВЛЕНИЕ ИГРОЙ
         // ====================================================
         function setGameMode(mode) {
             gameMode = mode;
             
-            // Обновляем активную кнопку
             document.querySelectorAll('.mode-btn').forEach(btn => {
                 btn.classList.remove('active');
             });
@@ -2104,7 +2073,6 @@
             else if (mode === 'online') buttons[1].classList.add('active');
             else if (mode === 'local') buttons[2].classList.add('active');
             
-            // Показываем/скрываем панель онлайн игр
             const onlinePanel = document.getElementById('online-game-panel');
             if (mode === 'online') {
                 onlinePanel.style.display = 'block';
@@ -2113,7 +2081,6 @@
                 onlinePanel.style.display = 'none';
             }
             
-            // Показываем/скрываем настройки бота
             const botControls = document.getElementById('bot-controls');
             if (mode === 'bot') {
                 botControls.style.display = 'block';
@@ -2134,7 +2101,8 @@
         }
         
         function startNewGame() {
-            // Если есть активная онлайн игра, выходим из нее
+            console.log('🆕 Начало новой игры. Режим:', gameMode);
+            
             if (currentGame && gameMode === 'online') {
                 leaveOnlineGame();
             }
@@ -2180,15 +2148,6 @@
                 player1Card.classList.add('active');
             } else {
                 player2Card.classList.add('active');
-            }
-        }
-        
-        function updateGameUI(game) {
-            // Базовая реализация
-            if (game.status === 'waiting') {
-                document.getElementById('game-status').textContent = 'Ожидание соперника...';
-            } else if (game.status === 'active') {
-                document.getElementById('game-status').textContent = 'Игра идет...';
             }
         }
         
@@ -2251,7 +2210,6 @@
         
         async function logout() {
             try {
-                // Удаляем слушателей
                 removeFirebaseListeners();
                 
                 if (userStatusRef) {
@@ -2390,6 +2348,12 @@
             console.log('Ожидающие игры:', waitingGames);
             console.log('Текущая игра:', currentGame);
             console.log('Режим игры:', gameMode);
+            console.log('Состояние игры:', {
+                gameActive: gameActive,
+                currentPlayer: currentPlayer,
+                selectedChecker: selectedChecker,
+                availableMoves: availableMoves
+            });
             
             showNotification('✅ Информация выведена в консоль');
         }
@@ -2405,33 +2369,22 @@
             });
         }
         
-        function debugSendTestMessage() {
-            if (!currentUser) {
-                showNotification('⚠️ Сначала войдите в систему');
-                return;
-            }
+        function debugTestMove() {
+            console.log('🧪 Тестирование хода...');
+            startNewGame();
             
-            database.ref('chat').push().set({
-                senderId: currentUser.uid,
-                senderName: currentUser.username,
-                message: 'Тестовое сообщение от ' + new Date().toLocaleTimeString(),
-                timestamp: firebase.database.ServerValue.TIMESTAMP,
-                type: 'debug'
-            }).then(() => {
-                showNotification('✅ Тестовое сообщение отправлено');
-            });
+            // Выбираем шашку игрока 1 (должна быть в ряду 5-7)
+            for (let row = 5; row < 8; row++) {
+                for (let col = 0; col < 8; col++) {
+                    if (boardState[row][col] === 1) {
+                        console.log('🧪 Найдена шашка игрока 1:', row, col);
+                        handleCellClick(row, col);
+                        return;
+                    }
+                }
+            }
+            console.log('❌ Не найдены шашки игрока 1 для теста');
         }
-        
-        function debugForceRefresh() {
-            updateOnlineUsersList();
-            updateGamesList();
-            showNotification('✅ Данные принудительно обновлены');
-        }
-        
-        // Инициализация при загрузке
-        window.onload = function() {
-            console.log('🎮 Игра загружена и готова к работе!');
-        };
     </script>
 </body>
 </html>
