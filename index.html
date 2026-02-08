@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Онлайн шашки W</title>
+    <title>Онлайн шашки</title>
     
     <!-- Firebase SDK -->
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
@@ -784,7 +784,7 @@
         <div id="user-info-panel" style="display: none;">
             <div>
                 <h2>👋 Привет, <span id="currentUserName"></span>! <span id="adminBadge" class="admin-badge" style="display: none;">АДМИН</span></h2>
-                <p>Рейтинг: <span id="currentUserRating" class="stat-value">1000</span></p>
+                <p>Рейтинг: <span id="currentUserRating" class="stat-value">калибровка</span></p>
                 <div id="calibrationInfo" class="calibration-info" style="display: none;"></div>
             </div>
             <div id="user-stats">
@@ -803,7 +803,7 @@
             </div>
             <div>
                 <button class="btn btn-secondary" onclick="logout()">🚪 Выйти</button>
-                <button class="btn btn-rating" onclick="resetRating()" style="margin-left: 10px;">🔄 Сбросить рейтинг</button>
+                <button class="btn btn-rating" onclick="resetRating()" style="margin-left: 10px; display: none;" id="personalResetBtn">🔄 Сбросить свой рейтинг</button>
                 <button id="adminPanelBtn" class="btn btn-admin" style="display: none; margin-left: 10px;" onclick="toggleAdminPanel()">⚙️ Админ-панель</button>
             </div>
         </div>
@@ -814,6 +814,7 @@
             <div class="btn-group">
                 <button class="btn btn-danger" onclick="clearChat()">🗑️ Очистить чат</button>
                 <button class="btn btn-admin" onclick="viewAllUsers()">👥 Все пользователи</button>
+                <button class="btn btn-danger" onclick="resetAllUsersRating()">⚠️ Сбросить рейтинг всем</button>
                 <button class="btn btn-secondary" onclick="toggleAdminPanel()">✖️ Закрыть</button>
             </div>
         </div>
@@ -828,7 +829,7 @@
                             <div class="player-color player1-color"></div>
                             <div>
                                 <div id="player1-name">Вы</div>
-                                <div id="player1-rating">Рейтинг: 1000</div>
+                                <div id="player1-rating">Рейтинг: калибровка</div>
                             </div>
                         </div>
                         <div class="player-card" id="player2-card">
@@ -1042,7 +1043,7 @@
                 const userData = {
                     username: username,
                     email: email,
-                    rating: 1000,
+                    rating: 0, // Изначально 0, не показываем пока не пройдет калибровку
                     wins: 0,
                     losses: 0,
                     draws: 0,
@@ -1211,13 +1212,53 @@
                 
                 Object.keys(users || {}).forEach(uid => {
                     const user = users[uid];
-                    userList += `${user.username} (Рейтинг: ${user.rating})${user.isAdmin ? ' 👑 Админ' : ''}\n`;
+                    const ratingDisplay = user.calibrationCompleted ? user.rating : 'калибровка';
+                    userList += `${user.username} (Рейтинг: ${ratingDisplay})${user.isAdmin ? ' 👑 Админ' : ''}\n`;
                 });
                 
                 alert(userList);
             } catch (error) {
                 console.error('❌ Ошибка загрузки пользователей:', error);
                 showNotification('❌ Ошибка загрузки пользователей', 'error');
+            }
+        }
+        
+        async function resetAllUsersRating() {
+            if (!currentUser?.isAdmin) {
+                showNotification('❌ У вас нет прав администратора', 'error');
+                return;
+            }
+            
+            if (confirm('ВНИМАНИЕ! Вы уверены, что хотите сбросить рейтинг ВСЕМ пользователям? Это действие нельзя отменить.')) {
+                try {
+                    const snapshot = await database.ref('users').once('value');
+                    const users = snapshot.val();
+                    const updates = {};
+                    
+                    Object.keys(users || {}).forEach(uid => {
+                        updates[`${uid}/rating`] = 0;
+                        updates[`${uid}/calibrationGames`] = 0;
+                        updates[`${uid}/calibrationCompleted`] = false;
+                        updates[`${uid}/ratingHistory`] = [];
+                        updates[`${uid}/lastRatingReset`] = firebase.database.ServerValue.TIMESTAMP;
+                    });
+                    
+                    await database.ref('users').update(updates);
+                    showNotification('✅ Рейтинг всех пользователей сброшен!');
+                    
+                    // Обновляем текущего пользователя, если он не админ
+                    if (currentUser && !currentUser.isAdmin) {
+                        currentUser.rating = 0;
+                        currentUser.calibrationGames = 0;
+                        currentUser.calibrationCompleted = false;
+                        currentUser.ratingHistory = [];
+                        updateUserUI();
+                    }
+                    
+                } catch (error) {
+                    console.error('❌ Ошибка сброса рейтинга:', error);
+                    showNotification('❌ Ошибка сброса рейтинга', 'error');
+                }
             }
         }
         
@@ -2308,16 +2349,17 @@
             }
             
             if (gameMode === 'giveaway') {
+                // В поддавках побеждает тот, кто первым остался без шашек
                 if (!player1HasPieces || !player1HasMoves) {
-                    endGame(2);
+                    endGame(1); // Игрок проиграл все шашки - ПОБЕДА в поддавках!
                 } else if (!player2HasPieces || !player2HasMoves) {
-                    endGame(1);
+                    endGame(2); // Бот проиграл все шашки - ПОРАЖЕНИЕ в поддавках!
                 }
             } else {
                 if (!player1HasPieces || !player1HasMoves) {
-                    endGame(2);
+                    endGame(2); // Игрок проиграл
                 } else if (!player2HasPieces || !player2HasMoves) {
-                    endGame(1);
+                    endGame(1); // Игрок победил
                 }
             }
         }
@@ -2329,14 +2371,27 @@
             let gameResult = '';
             
             if (gameMode === 'giveaway') {
+                // ПОДДАВКИ: цель - избавиться от шашек
                 if (winner === 1) {
-                    message = '🎉 Вы проиграли все шашки! Победа в поддавках!';
+                    // Игрок избавился от шашек первым - ПОБЕДА
+                    message = '🎉 Вы отдали все шашки первым! Победа в поддавках!';
                     gameResult = 'win';
                 } else {
-                    message = '😞 Бот отдал все шашки! Вы проиграли в поддавках.';
+                    // Бот избавился от шашек первым - ПОРАЖЕНИЕ
+                    message = '😞 Бот отдал все шашки первым! Вы проиграли в поддавках.';
+                    gameResult = 'loss';
+                }
+            } else if (gameMode === 'rating') {
+                // РЕЙТИНГОВАЯ ИГРА
+                if (winner === 1) {
+                    message = '🎉 Вы победили в рейтинговой игре!';
+                    gameResult = 'win';
+                } else {
+                    message = '😞 Вы проиграли в рейтинговой игре';
                     gameResult = 'loss';
                 }
             } else {
+                // ОБЫЧНЫЕ ШАШКИ
                 if (winner === 1) {
                     message = '🎉 Вы победили!';
                     gameResult = 'win';
@@ -2349,11 +2404,11 @@
             document.getElementById('game-status').textContent = message;
             
             // Обновляем статистику пользователя
-            if (currentUser && gameMode !== 'rating') {
+            if (currentUser) {
                 updateUserStats(gameResult);
             }
             
-            // Обновляем рейтинг в рейтинговом режиме
+            // Обновляем рейтинг ТОЛЬКО в рейтинговом режиме
             if (currentUser && gameMode === 'rating') {
                 updateRating(gameResult);
             }
@@ -2365,6 +2420,8 @@
         }
         
         function countPiecesForRating(winner) {
+            if (gameMode !== 'rating') return;
+            
             let player1Pieces = 0;
             let player2Pieces = 0;
             
@@ -2376,9 +2433,7 @@
                 }
             }
             
-            if (gameMode === 'rating') {
-                console.log(`Рейтинговая игра завершена. Осталось шашек: игрок - ${player1Pieces}, бот - ${player2Pieces}`);
-            }
+            console.log(`Рейтинговая игра завершена. Осталось шашек: игрок - ${player1Pieces}, бот - ${player2Pieces}`);
         }
         
         function updateGameStats() {
@@ -2490,6 +2545,10 @@
                 6. При достижении последней горизонтали шашка становится дамкой
                 7. При взятии можно продолжать бить дальше
                 
+                Режим "Поддавки":
+                - Цель игры - избавиться от ВСЕХ своих шашек ПЕРВЫМ
+                - Побеждает тот, кто первым остался без шашек
+                
                 Особенности режима "Туман войны":
                 - Половина доски соперника скрыта туманом
                 - Шашки соперника видны только в радиусе 2 клеток от ваших шашек
@@ -2498,8 +2557,9 @@
                 Рейтинговая система:
                 - Первые 3 игры - калибровочные
                 - После калибровки рейтинг от 1000 до 4000
-                - Можно сбросить рейтинг раз в месяц
+                - Рейтинг меняется ТОЛЬКО в рейтинговом режиме
                 - В рейтинговом режиме всегда игра против эксперта
+                - Только админ может сбросить рейтинг всем пользователям
                 
                 Удачи в игре! 🎮
             `;
@@ -2609,7 +2669,7 @@
                 const snapshot = await userRef.once('value');
                 const userData = snapshot.val() || {};
                 
-                let userRating = userData.rating || 1000;
+                let userRating = userData.rating || 0;
                 let userCalibrationGames = userData.calibrationGames || 0;
                 let userCalibrationCompleted = userData.calibrationCompleted || false;
                 let userRatingHistory = userData.ratingHistory || [];
@@ -2625,15 +2685,22 @@
                 if (!userCalibrationCompleted && userCalibrationGames < 3) {
                     userCalibrationGames++;
                     
+                    // КАЛИБРОВКА: определяем начальный рейтинг
                     if (result === 1) {
+                        // Победа в калибровочной игре - высокий рейтинг
                         ratingChange = 1000;
+                        newRating = 2500 + (Math.random() * 1000); // 2500-3500
                     } else if (result === 0.5) {
+                        // Ничья в калибровочной игре - средний рейтинг
                         ratingChange = 500;
+                        newRating = 1500 + (Math.random() * 1000); // 1500-2500
                     } else {
+                        // Поражение в калибровочной игре - низкий рейтинг
                         ratingChange = 0;
+                        newRating = 1000 + (Math.random() * 500); // 1000-1500
                     }
                     
-                    newRating = userRating + ratingChange;
+                    newRating = Math.round(newRating);
                     
                     if (userCalibrationGames >= 3) {
                         userCalibrationCompleted = true;
@@ -2641,9 +2708,10 @@
                         if (newRating < 1000) newRating = 1000;
                         if (newRating > 4000) newRating = 4000;
                         
-                        showNotification(`🎯 Калибровка завершена! Ваш рейтинг: ${Math.round(newRating)}`);
+                        showNotification(`🎯 Калибровка завершена! Ваш рейтинг: ${newRating}`);
                     }
                 } else {
+                    // Обычная игра после калибровки
                     const expectedScore = 1 / (1 + Math.pow(10, (2000 - userRating) / 400));
                     const kFactor = calculateKFactor(userRating);
                     
@@ -2674,9 +2742,12 @@
                     lastRatingReset: userLastRatingReset
                 });
                 
-                document.getElementById('currentUserRating').textContent = Math.round(newRating);
+                // Обновляем текущего пользователя
+                currentUser.rating = Math.round(newRating);
+                currentUser.calibrationGames = userCalibrationGames;
+                currentUser.calibrationCompleted = userCalibrationCompleted;
                 
-                updateCalibrationInfo();
+                updateUserUI();
                 
                 if (ratingChange > 0) {
                     showNotification(`📈 Рейтинг +${ratingChange} = ${Math.round(newRating)}`);
@@ -2685,8 +2756,6 @@
                 } else {
                     showNotification(`📊 Рейтинг не изменился: ${Math.round(newRating)}`);
                 }
-                
-                updateUserStats(gameResult, true);
                 
             } catch (error) {
                 console.error('❌ Ошибка обновления рейтинга:', error);
@@ -2717,17 +2786,20 @@
                     return;
                 }
                 
-                if (confirm('Вы уверены, что хотите сбросить рейтинг? Все калибровочные игры будут сброшены, рейтинг установлен в 1000.')) {
+                if (confirm('Вы уверены, что хотите сбросить свой рейтинг? Все калибровочные игры будут сброшены.')) {
                     await userRef.update({
-                        rating: 1000,
+                        rating: 0,
                         calibrationGames: 0,
                         calibrationCompleted: false,
                         lastRatingReset: firebase.database.ServerValue.TIMESTAMP
                     });
                     
-                    document.getElementById('currentUserRating').textContent = '1000';
-                    updateCalibrationInfo();
-                    showNotification('✅ Рейтинг сброшен до 1000');
+                    currentUser.rating = 0;
+                    currentUser.calibrationGames = 0;
+                    currentUser.calibrationCompleted = false;
+                    
+                    updateUserUI();
+                    showNotification('✅ Ваш рейтинг сброшен');
                 }
             } catch (error) {
                 console.error('❌ Ошибка сброса рейтинга:', error);
@@ -2789,6 +2861,11 @@
                 document.getElementById('adminBadge').style.display = 'inline-block';
             }
             
+            // Показываем кнопку сброса рейтинга только если пользователь не админ
+            if (currentUser && !currentUser.isAdmin) {
+                document.getElementById('personalResetBtn').style.display = 'inline-block';
+            }
+            
             chatRef = database.ref('chat').limitToLast(50);
             chatListener = (snapshot) => {
                 const messages = snapshot.val();
@@ -2801,7 +2878,16 @@
             if (!currentUser) return;
             
             document.getElementById('currentUserName').textContent = currentUser.username;
-            document.getElementById('currentUserRating').textContent = currentUser.rating || 1000;
+            
+            // Показываем рейтинг только после калибровки
+            if (currentUser.calibrationCompleted) {
+                document.getElementById('currentUserRating').textContent = currentUser.rating || 0;
+                document.getElementById('player1-rating').textContent = `Рейтинг: ${currentUser.rating || 0}`;
+            } else {
+                document.getElementById('currentUserRating').textContent = 'калибровка';
+                document.getElementById('player1-rating').textContent = 'Рейтинг: калибровка';
+            }
+            
             document.getElementById('userWins').textContent = currentUser.wins || 0;
             document.getElementById('userLosses').textContent = currentUser.losses || 0;
             document.getElementById('userDraws').textContent = currentUser.draws || 0;
@@ -2811,7 +2897,7 @@
             document.getElementById('player1-name').textContent = currentUser.username;
         }
         
-        async function updateUserStats(result, skipRatingUpdate = false) {
+        async function updateUserStats(result) {
             if (!currentUser) return;
             
             try {
@@ -2821,6 +2907,7 @@
                 
                 const updates = {};
                 
+                // Обновляем статистику игр (победы/поражения/ничьи)
                 if (result === 'win') {
                     updates.wins = (userData.wins || 0) + 1;
                 } else if (result === 'loss') {
@@ -2829,25 +2916,17 @@
                     updates.draws = (userData.draws || 0) + 1;
                 }
                 
-                if (gameMode !== 'rating' && !skipRatingUpdate) {
-                    if (result === 'win') {
-                        updates.rating = Math.min(4000, (userData.rating || 1000) + 10);
-                    } else if (result === 'loss') {
-                        updates.rating = Math.max(100, (userData.rating || 1000) - 10);
-                    }
-                }
+                // РЕЙТИНГ НЕ МЕНЯЕТСЯ В НЕ-РЕЙТИНГОВЫХ РЕЖИМАХ
                 
                 await userRef.update(updates);
                 
+                // Обновляем локальные данные
                 Object.assign(currentUser, updates);
                 
+                // Обновляем UI
                 document.getElementById('userWins').textContent = currentUser.wins || 0;
                 document.getElementById('userLosses').textContent = currentUser.losses || 0;
                 document.getElementById('userDraws').textContent = currentUser.draws || 0;
-                
-                if (gameMode !== 'rating') {
-                    document.getElementById('currentUserRating').textContent = currentUser.rating || 1000;
-                }
                 
             } catch (error) {
                 console.error('❌ Ошибка обновления статистики:', error);
