@@ -339,10 +339,22 @@
             animation: dangerPulse 1.5s infinite;
         }
         
+        .cell.warning-zone {
+            background-color: #ffcc00 !important;
+            opacity: 0.7;
+            animation: warningPulse 1.5s infinite;
+        }
+        
         @keyframes dangerPulse {
             0% { opacity: 0.5; }
             50% { opacity: 0.9; }
             100% { opacity: 0.5; }
+        }
+        
+        @keyframes warningPulse {
+            0% { opacity: 0.4; }
+            50% { opacity: 0.8; }
+            100% { opacity: 0.4; }
         }
         
         .cell.selected {
@@ -699,6 +711,15 @@
             text-align: center;
         }
         
+        .warning-zone-info {
+            background: rgba(255, 204, 0, 0.3);
+            border: 1px solid #ffcc00;
+            border-radius: 10px;
+            padding: 15px;
+            margin: 10px 0;
+            text-align: center;
+        }
+        
         .danger-zone-level {
             font-size: 1.5rem;
             color: #ffcc00;
@@ -931,7 +952,10 @@
                 <!-- ИНФОРМАЦИЯ О ГЛАДИАТОРСКОМ РЕЖИМЕ -->
                 <div id="gladiator-info">
                     <h3>⚔️ Гладиаторский режим</h3>
-                    <div class="danger-zone-info">
+                    <div id="warning-zone-info" class="warning-zone-info" style="display: none;">
+                        <div>⚠️ <strong>ВНИМАНИЕ!</strong> Следующим ходом расширится красная зона!</div>
+                    </div>
+                    <div id="danger-zone-info" class="danger-zone-info">
                         <div>🔥 Красная зона расширится через: <span id="danger-zone-timer">2</span> хода</div>
                         <div class="danger-zone-level">Уровень красной зоны: <span id="danger-zone-level">0</span></div>
                         <div>Осталось объектов: <span id="survivors-count">7</span>/7</div>
@@ -1467,32 +1491,74 @@
         function initGladiatorBoard() {
             gladiatorBoard = Array(8).fill().map(() => Array(8).fill(0));
             
+            // Получаем все клетки на границе (внешние 2 ряда)
             let borderCells = [];
             for (let row = 0; row < 8; row++) {
                 for (let col = 0; col < 8; col++) {
                     if ((row + col) % 2 === 1) {
-                        if (row < 2 || row >= 6 || col < 2 || col >= 6) {
+                        // Клетка на границе (ряд 0,1,6,7 или колонка 0,1,6,7)
+                        if (row <= 1 || row >= 6 || col <= 1 || col >= 6) {
                             borderCells.push({ row, col });
                         }
                     }
                 }
             }
             
+            // Перемешиваем клетки
             borderCells.sort(() => Math.random() - 0.5);
             
+            // Размещаем игрока
+            let playerPlaced = false;
             let placedCount = 0;
-            let skipNext = false;
             
-            for (let i = 0; i < borderCells.length && placedCount < 7; i++) {
-                if (skipNext) {
-                    skipNext = false;
-                    continue;
+            for (let i = 0; i < borderCells.length && (!playerPlaced || placedCount < 7); i++) {
+                const cell = borderCells[i];
+                let canPlace = true;
+                
+                // Проверяем расстояние до других фигур
+                for (let r = 0; r < 8; r++) {
+                    for (let c = 0; c < 8; c++) {
+                        if (gladiatorBoard[r][c] !== 0) {
+                            const distance = Math.abs(r - cell.row) + Math.abs(c - cell.col);
+                            if (distance <= 1) {
+                                canPlace = false;
+                                break;
+                            }
+                        }
+                    }
+                    if (!canPlace) break;
                 }
                 
-                const cell = borderCells[i];
-                gladiatorBoard[cell.row][cell.col] = (placedCount === 0) ? 1 : 2;
-                placedCount++;
-                skipNext = true;
+                if (canPlace) {
+                    if (!playerPlaced) {
+                        gladiatorBoard[cell.row][cell.col] = 1;
+                        playerPlaced = true;
+                        placedCount++;
+                    } else if (placedCount < 7) {
+                        gladiatorBoard[cell.row][cell.col] = 2;
+                        placedCount++;
+                    }
+                }
+            }
+            
+            // Если не удалось разместить с расстоянием, размещаем просто на границе
+            if (!playerPlaced) {
+                for (let cell of borderCells) {
+                    if (gladiatorBoard[cell.row][cell.col] === 0) {
+                        gladiatorBoard[cell.row][cell.col] = 1;
+                        playerPlaced = true;
+                        placedCount++;
+                        break;
+                    }
+                }
+            }
+            
+            // Размещаем оставшихся ботов
+            for (let cell of borderCells) {
+                if (gladiatorBoard[cell.row][cell.col] === 0 && placedCount < 7) {
+                    gladiatorBoard[cell.row][cell.col] = 2;
+                    placedCount++;
+                }
             }
             
             dangerZoneLevel = 0;
@@ -1507,7 +1573,7 @@
             updateBoardUI();
             updateDangerZoneDisplay();
             
-            showNotification('⚔️ Гладиаторская доска создана! 1 игрок против 6 ботов');
+            showNotification('⚔️ Гладиаторская доска создана! 1 игрок против 6 ботов на границе карты');
         }
         
         function updateGladiatorUI() {
@@ -1522,6 +1588,15 @@
             
             document.getElementById('game-status').textContent = playerAlive ? 
                 'Ваш ход в гладиаторской битве!' : 'Вы выбыли из битвы!';
+            
+            // Показываем/скрываем предупреждение
+            const warningInfo = document.getElementById('warning-zone-info');
+            if (dangerZoneTimer === 1) {
+                warningInfo.style.display = 'block';
+                showNotification('⚠️ Внимание! Следующим ходом расширится красная зона!', 'warning');
+            } else {
+                warningInfo.style.display = 'none';
+            }
         }
         
         function updateDangerZoneDisplay() {
@@ -1529,12 +1604,24 @@
             cells.forEach(cell => {
                 const row = parseInt(cell.dataset.row);
                 const col = parseInt(cell.dataset.col);
-                cell.classList.remove('danger-zone');
+                cell.classList.remove('danger-zone', 'warning-zone');
                 
                 if (dangerZoneLevel > 0) {
                     if (row < dangerZoneLevel || row >= 8 - dangerZoneLevel || 
                         col < dangerZoneLevel || col >= 8 - dangerZoneLevel) {
                         cell.classList.add('danger-zone');
+                    }
+                }
+                
+                // Показываем желтую зону за 1 ход до расширения
+                if (dangerZoneTimer === 1) {
+                    const warningLevel = dangerZoneLevel + 1;
+                    if (row < warningLevel || row >= 8 - warningLevel || 
+                        col < warningLevel || col >= 8 - warningLevel) {
+                        // Не накладываем желтую зону на уже красную
+                        if (!cell.classList.contains('danger-zone')) {
+                            cell.classList.add('warning-zone');
+                        }
                     }
                 }
             });
@@ -1607,7 +1694,7 @@
                     gladiatorBoard[captureRow][captureCol] === enemy &&
                     gladiatorBoard[jumpRow][jumpCol] === 0) {
                     
-                    if (!isInDangerZone(jumpRow, jumpCol)) {
+                    if (!isInDangerZone(jumpRow, jumpCol) && !isInWarningZone(jumpRow, jumpCol)) {
                         moves.push({
                             row: jumpRow,
                             col: jumpCol,
@@ -1629,7 +1716,7 @@
                 
                 if (isValidPosition(newRow, newCol) && 
                     gladiatorBoard[newRow][newCol] === 0 &&
-                    !isInDangerZone(newRow, newCol)) {
+                    !isInDangerZone(newRow, newCol) && !isInWarningZone(newRow, newCol)) {
                     
                     moves.push({
                         row: newRow,
@@ -1647,6 +1734,12 @@
             return dangerZoneLevel > 0 && 
                    (row < dangerZoneLevel || row >= 8 - dangerZoneLevel || 
                     col < dangerZoneLevel || col >= 8 - dangerZoneLevel);
+        }
+        
+        function isInWarningZone(row, col) {
+            return dangerZoneTimer === 1 && 
+                   (row < dangerZoneLevel + 1 || row >= 7 - dangerZoneLevel || 
+                    col < dangerZoneLevel + 1 || col >= 7 - dangerZoneLevel);
         }
         
         function makeGladiatorMove(toRow, toCol) {
@@ -1690,6 +1783,9 @@
             dangerZoneTimer--;
             if (dangerZoneTimer <= 0) {
                 expandDangerZone();
+            } else {
+                updateGladiatorUI();
+                updateDangerZoneDisplay();
             }
             
             gladiatorTurn++;
@@ -1721,6 +1817,7 @@
             function makeNextBotMove() {
                 if (botIndex >= bots.length || !playerAlive || botsAlive === 0) {
                     updateGladiatorUI();
+                    updateDangerZoneDisplay();
                     checkGladiatorGameEnd();
                     return;
                 }
@@ -1774,8 +1871,8 @@
                     }
                 }
                 
-                if (isInDangerZone(move.row, move.col)) {
-                    score -= 50;
+                if (isInDangerZone(move.row, move.col) || isInWarningZone(move.row, move.col)) {
+                    score -= 100;
                 }
                 
                 const distanceToCenter = Math.abs(move.row - 3.5) + Math.abs(move.col - 3.5);
@@ -1787,7 +1884,7 @@
                     move.col,
                     7 - move.col
                 );
-                score += distanceToDanger * 3;
+                score += distanceToDanger * 5;
                 
                 if (score > bestScore) {
                     bestScore = score;
@@ -1878,8 +1975,12 @@
                     const cell = document.createElement('div');
                     
                     let cellClass = `cell ${(row + col) % 2 === 0 ? 'light' : 'dark'}`;
-                    if (gladiatorMode && isInDangerZone(row, col)) {
-                        cellClass += ' danger-zone';
+                    if (gladiatorMode) {
+                        if (isInDangerZone(row, col)) {
+                            cellClass += ' danger-zone';
+                        } else if (isInWarningZone(row, col)) {
+                            cellClass += ' warning-zone';
+                        }
                     }
                     
                     cell.className = cellClass;
@@ -2294,8 +2395,12 @@
                 const piece = boardState[row][col];
                 
                 let cellClass = `cell ${(row + col) % 2 === 0 ? 'light' : 'dark'}`;
-                if (gladiatorMode && isInDangerZone(row, col)) {
-                    cellClass += ' danger-zone';
+                if (gladiatorMode) {
+                    if (isInDangerZone(row, col)) {
+                        cellClass += ' danger-zone';
+                    } else if (isInWarningZone(row, col)) {
+                        cellClass += ' warning-zone';
+                    }
                 }
                 cell.className = cellClass;
                 
@@ -2728,10 +2833,12 @@
                 - Побеждает тот, кто первым остался без шашек
                 
                 Режим "Гладиатор":
-                - 1 игрок против 6 ботов на границах доски
+                - 1 игрок против 6 ботов НА ГРАНИЦЕ КАРТЫ
+                - Все фигуры спавнятся с расстоянием минимум 1 клетка между ними
                 - Все ходят в любом направлении, дамок нет
                 - Каждые 2 хода красная зона расширяется от границ к центру
-                - В красную зону нельзя заходить
+                - За 1 ход до расширения зона становится ЖЕЛТОЙ (предупреждение)
+                - В красную и желтую зоны нельзя заходить
                 - Боты дерутся друг с другом
                 - Побеждает последний выживший
                 
@@ -2742,7 +2849,7 @@
                 - В рейтинговом режиме всегда игра против эксперта
                 - Только админ может сбросить рейтинг всем пользователям
                 
-                Удачи в игре! 🎮
+                Удачи в играх! 🎮
             `;
             alert(rules);
         }
@@ -3102,8 +3209,13 @@
             notification.className = 'notification';
             notification.textContent = message;
             
-            if (type === 'warning') notification.style.background = 'rgba(255, 193, 7, 0.9)';
-            else if (type === 'error') notification.style.background = 'rgba(220, 53, 69, 0.9)';
+            if (type === 'warning') {
+                notification.style.background = 'rgba(255, 204, 0, 0.9)';
+                notification.style.color = '#000';
+            } else if (type === 'error') {
+                notification.style.background = 'rgba(220, 53, 69, 0.9)';
+                notification.style.color = 'white';
+            }
             
             notificationArea.appendChild(notification);
             setTimeout(() => notification.remove(), 3000);
