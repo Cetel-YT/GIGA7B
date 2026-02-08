@@ -367,6 +367,9 @@ function setGameMode(mode) {
     gameMode = mode;
     gladiatorMode = (mode === 'gladiator');
     
+    // Сбрасываем состояние доски
+    currentBoardSize = gladiatorMode ? BOARD_SIZE_GLADIATOR : BOARD_SIZE_NORMAL;
+    
     document.querySelectorAll('.mode-btn').forEach(btn => {
         btn.classList.remove('active', 'rating-active', 'gladiator-active');
     });
@@ -421,8 +424,15 @@ function setGameMode(mode) {
         updateBotLevel();
     }
     
-    showNotification(`✅ Режим изменен: ${modeNames[mode]}`);
+    // ОЧЕНЬ ВАЖНО: Сбрасываем состояние игры и перерисовываем доску
+    gameActive = false;
+    selectedChecker = null;
+    availableMoves = [];
+    
+    // Переинициализируем доску с правильным размером
     startNewGame();
+    
+    showNotification(`✅ Режим изменен: ${modeNames[mode]}`);
 }
 
 function getModeName(mode) {
@@ -542,7 +552,7 @@ function initGladiatorBoard() {
     
     updateGladiatorUI();
     boardState = gladiatorBoard;
-    updateBoardUI();
+    initBoard();
     updateDangerZoneDisplay();
 }
 
@@ -1066,7 +1076,7 @@ function makeGladiatorMove(toRow, toCol) {
 }
 
 function makeGladiatorBotMoves() {
-    if (!playerAlive || botsAlive === 0) {
+    if (!playerAlive || botsAlive === 0 || !gameActive) {
         checkGladiatorGameEnd();
         return;
     }
@@ -1085,16 +1095,7 @@ function makeGladiatorBotMoves() {
         }
     }
     
-    let anyBotCanMove = false;
-    for (const bot of bots) {
-        const moves = getGladiatorAvailableMoves(bot.row, bot.col, 2);
-        if (moves.length > 0) {
-            anyBotCanMove = true;
-            break;
-        }
-    }
-    
-    if (!anyBotCanMove) {
+    if (bots.length === 0) {
         isPlayerTurn = true;
         updateGladiatorUI();
         updateDangerZoneDisplay();
@@ -1102,13 +1103,14 @@ function makeGladiatorBotMoves() {
         return;
     }
     
+    // Перемешиваем ботов для случайного порядка хода
     bots.sort(() => Math.random() - 0.5);
+    
     let botIndex = 0;
     let movesMade = 0;
-    const maxMoves = 1;
     
     function makeNextBotMove() {
-        if (botIndex >= bots.length || movesMade >= maxMoves || !playerAlive || botsAlive === 0) {
+        if (botIndex >= bots.length || movesMade >= bots.length || !playerAlive || botsAlive === 0) {
             isPlayerTurn = true;
             updateGladiatorUI();
             updateDangerZoneDisplay();
@@ -1119,13 +1121,9 @@ function makeGladiatorBotMoves() {
         const bot = bots[botIndex];
         const botKey = `${bot.row}-${bot.col}`;
         
-        let canMakeExtraMove = false;
-        if (botBuffs[botKey] && botBuffs[botKey].purple) {
-            canMakeExtraMove = true;
-        }
-        
         let moves = getGladiatorAvailableMoves(bot.row, bot.col, 2);
         
+        // Проверяем, есть ли обязательное взятие
         if (moves.some(m => m.isCapture) && botBuffs[botKey] && botBuffs[botKey].green > 0) {
             const normalMoves = getGladiatorAvailableMoves(bot.row, bot.col, 2, true);
             if (normalMoves.length > 0 && Math.random() < 0.3) {
@@ -1138,12 +1136,15 @@ function makeGladiatorBotMoves() {
             const bestMove = selectBestBotMove(moves, bot.row, bot.col, botKey);
             
             if (bestMove) {
+                // Сохраняем состояние баффов перед ходом
+                const hadPurpleBuff = botBuffs[botKey] && botBuffs[botKey].purple;
+                
                 gladiatorBoard[bot.row][bot.col] = 0;
                 gladiatorBoard[bestMove.row][bestMove.col] = 2;
                 
                 const newKey = `${bestMove.row}-${bestMove.col}`;
                 if (botBuffs[botKey]) {
-                    botBuffs[newKey] = botBuffs[botKey];
+                    botBuffs[newKey] = { ...botBuffs[botKey] };
                     delete botBuffs[botKey];
                 }
                 
@@ -1182,18 +1183,31 @@ function makeGladiatorBotMoves() {
                 updateBoardUI();
                 movesMade++;
                 
-                if (canMakeExtraMove && botUsePurpleSupply(newKey)) {
+                // Если у бота был фиолетовый бафф, он может сделать дополнительный ход
+                if (hadPurpleBuff && botUsePurpleSupply(newKey)) {
+                    // Остаемся на том же боте для дополнительного хода
+                    setTimeout(() => {
+                        makeNextBotMove();
+                    }, 100);
+                    return;
                 } else {
                     botIndex++;
+                    setTimeout(() => {
+                        makeNextBotMove();
+                    }, 100);
                 }
             } else {
                 botIndex++;
+                setTimeout(() => {
+                    makeNextBotMove();
+                }, 50);
             }
         } else {
             botIndex++;
+            setTimeout(() => {
+                makeNextBotMove();
+            }, 50);
         }
-        
-        setTimeout(makeNextBotMove, 100);
     }
     
     makeNextBotMove();
@@ -1253,6 +1267,29 @@ function selectBestBotMove(moves, fromRow, fromCol, botKey) {
         
         if (isVulnerableGladiator(move.row, move.col, 2)) {
             score -= 80;
+        }
+        
+        // Предпочитаем ходы, которые ведут к дальнейшим взятиям
+        if (move.isCapture) {
+            const tempBoard = JSON.parse(JSON.stringify(gladiatorBoard));
+            tempBoard[fromRow][fromCol] = 0;
+            tempBoard[move.row][move.col] = 2;
+            tempBoard[move.captureRow][move.captureCol] = 0;
+            
+            const nextCaptures = [];
+            for (const dir of [{ dr: -1, dc: -1 }, { dr: -1, dc: 1 }, { dr: 1, dc: -1 }, { dr: 1, dc: 1 }]) {
+                const nextCaptureRow = move.row + dir.dr;
+                const nextCaptureCol = move.col + dir.dc;
+                const nextJumpRow = move.row + dir.dr * 2;
+                const nextJumpCol = move.col + dir.dc * 2;
+                
+                if (isValidGladiatorPosition(nextCaptureRow, nextCaptureCol) && 
+                    isValidGladiatorPosition(nextJumpRow, nextJumpCol) &&
+                    tempBoard[nextCaptureRow][nextCaptureCol] !== 0 &&
+                    tempBoard[nextJumpRow][nextJumpCol] === 0) {
+                    score += 30;
+                }
+            }
         }
         
         if (score > bestScore) {
@@ -1330,7 +1367,6 @@ function startGladiatorRound() {
     isPlayerTurn = true;
     hasContinuingCapture = false;
     updatePlayerCards();
-    initBoard(); // ВОТ ОСНОВНОЕ ИСПРАВЛЕНИЕ - вызываем initBoard для создания доски 32x32
     showNotification('⚔️ Гладиаторская битва 32x32 началась! Ваш ход.');
 }
 
@@ -1797,6 +1833,13 @@ function makeMove(toRow, toCol) {
             updateBoardUI();
             highlightAvailableMoves();
             showNotification('⚠️ Продолжайте взятие!');
+            
+            // Если это бот, он должен продолжить взятие
+            if (currentPlayer === 2 && gameActive && !botThinking) {
+                setTimeout(() => {
+                    makeBotMove();
+                }, 500);
+            }
             return;
         }
     }
@@ -2008,6 +2051,16 @@ function makeBotMove() {
     botThinking = true;
     const difficulty = document.getElementById('botDifficulty').value;
     
+    // Если есть продолжение взятия, используем доступные ходы
+    if (selectedChecker && availableMoves.length > 0) {
+        const move = getBestContinueMove(availableMoves, difficulty);
+        setTimeout(() => {
+            makeMove(move.row, move.col);
+            botThinking = false;
+        }, 300);
+        return;
+    }
+    
     const allMoves = [];
     const allCaptures = getAllCapturesForPlayer(2);
     
@@ -2066,6 +2119,70 @@ function makeBotMove() {
             botThinking = false;
         }, 300);
     }, 500);
+}
+
+function getBestContinueMove(moves, difficulty) {
+    // Для продолжения взятия выбираем лучший ход
+    if (moves.length === 0) return moves[0];
+    
+    let bestMove = moves[0];
+    let bestScore = -Infinity;
+    
+    moves.forEach(move => {
+        let score = 0;
+        
+        // Базовый счет за взятие
+        if (move.isCapture) score += 20;
+        
+        // Учитываем ценность захваченной шашки
+        if (move.captureData) {
+            const capturedPiece = boardState[move.captureData.captureRow][move.captureData.captureCol];
+            if (capturedPiece === 3 || capturedPiece === 4) score += 15;
+        }
+        
+        // Проверяем, ведет ли ход к дальнейшим взятиям
+        const tempBoard = JSON.parse(JSON.stringify(boardState));
+        tempBoard[move.row][move.col] = tempBoard[selectedChecker.row][selectedChecker.col];
+        tempBoard[selectedChecker.row][selectedChecker.col] = 0;
+        if (move.isCapture && move.captureData) {
+            tempBoard[move.captureData.captureRow][move.captureData.captureCol] = 0;
+        }
+        
+        const nextCaptures = getCapturesForChecker(move.row, move.col);
+        if (nextCaptures.length > 0) {
+            score += 25;
+            
+            // Для экспертного уровня дополнительная оценка
+            if (difficulty === 'expert') {
+                let maxFutureCaptures = 0;
+                nextCaptures.forEach(nextCapture => {
+                    // Рекурсивно оцениваем цепочку взятий
+                    let futureCaptures = 1;
+                    const tempBoard2 = JSON.parse(JSON.stringify(tempBoard));
+                    tempBoard2[nextCapture.row][nextCapture.col] = tempBoard2[move.row][move.col];
+                    tempBoard2[move.row][move.col] = 0;
+                    if (nextCapture.isCapture && nextCapture.captureData) {
+                        tempBoard2[nextCapture.captureData.captureRow][nextCapture.captureData.captureCol] = 0;
+                    }
+                    
+                    const nextNextCaptures = getCapturesForChecker(nextCapture.row, nextCapture.col);
+                    futureCaptures += nextNextCaptures.length;
+                    maxFutureCaptures = Math.max(maxFutureCaptures, futureCaptures);
+                });
+                score += maxFutureCaptures * 10;
+            }
+        }
+        
+        // Избегаем опасных позиций
+        if (isVulnerable(move.row, move.col, 2)) score -= 15;
+        
+        if (score > bestScore) {
+            bestScore = score;
+            bestMove = move;
+        }
+    });
+    
+    return bestMove;
 }
 
 function getEasyMove(moves) {
