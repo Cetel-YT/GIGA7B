@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Онлайн шашки</title>
+    <title>Онлайн шашки X</title>
     
     <!-- Firebase SDK -->
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
@@ -333,6 +333,18 @@
             background-color: #b58863;
         }
         
+        .cell.danger-zone {
+            background-color: #ff4444 !important;
+            opacity: 0.7;
+            animation: dangerPulse 1.5s infinite;
+        }
+        
+        @keyframes dangerPulse {
+            0% { opacity: 0.5; }
+            50% { opacity: 0.9; }
+            100% { opacity: 0.5; }
+        }
+        
         .cell.selected {
             box-shadow: inset 0 0 0 4px #00ff88;
         }
@@ -392,14 +404,6 @@
         
         .checker.player2 {
             background: radial-gradient(circle at 30% 30%, #2196f3, #1976d2);
-        }
-        
-        .checker.player3 {
-            background: radial-gradient(circle at 30% 30%, #ff9800, #ff5722);
-        }
-        
-        .checker.player4 {
-            background: radial-gradient(circle at 30% 30%, #9c27b0, #673ab7);
         }
         
         .checker.king {
@@ -672,7 +676,89 @@
             font-size: 1.2rem;
         }
         
-        /* Гладиаторский режим */
+        /* Гладиаторский режим - сетка 3x3 */
+        #gladiator-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 15px;
+            margin-bottom: 25px;
+        }
+        
+        .grid-cell {
+            aspect-ratio: 1;
+            background: rgba(40, 40, 50, 0.7);
+            border-radius: 10px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            border: 2px solid #444;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .grid-cell:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.3);
+        }
+        
+        .grid-cell.active {
+            border-color: #ff416c;
+            box-shadow: 0 0 20px rgba(255, 65, 108, 0.5);
+        }
+        
+        .grid-cell.danger {
+            border-color: #ff4444;
+            animation: gridDangerPulse 2s infinite;
+        }
+        
+        @keyframes gridDangerPulse {
+            0% { border-color: #ff4444; box-shadow: 0 0 10px rgba(255, 68, 68, 0.5); }
+            50% { border-color: #ff8888; box-shadow: 0 0 20px rgba(255, 136, 136, 0.7); }
+            100% { border-color: #ff4444; box-shadow: 0 0 10px rgba(255, 68, 68, 0.5); }
+        }
+        
+        .grid-cell.center {
+            background: rgba(60, 60, 70, 0.8);
+        }
+        
+        .grid-cell-content {
+            text-align: center;
+            padding: 10px;
+        }
+        
+        .grid-cell-title {
+            font-size: 1.2rem;
+            font-weight: bold;
+            margin-bottom: 5px;
+            color: #ffcc00;
+        }
+        
+        .grid-cell-stats {
+            font-size: 0.8rem;
+            color: #aaa;
+        }
+        
+        .cell-player {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: #ff416c;
+            display: inline-block;
+            margin: 0 2px;
+        }
+        
+        .cell-bot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: #2196f3;
+            display: inline-block;
+            margin: 0 2px;
+        }
+        
         #gladiator-controls {
             display: none;
             background: rgba(25, 25, 35, 0.9);
@@ -689,13 +775,6 @@
             border-bottom: 1px solid #444;
         }
         
-        #gladiator-navigation {
-            display: flex;
-            justify-content: center;
-            gap: 10px;
-            margin-bottom: 20px;
-        }
-        
         #gladiator-timer {
             text-align: center;
             font-size: 1.2rem;
@@ -703,119 +782,19 @@
             margin-bottom: 20px;
         }
         
-        #gladiator-players {
+        .danger-zone-info {
+            background: rgba(255, 68, 68, 0.2);
+            border: 1px solid #ff4444;
+            border-radius: 10px;
+            padding: 15px;
+            margin-bottom: 20px;
             text-align: center;
-            font-size: 0.9rem;
-            color: #aaa;
         }
         
-        /* Стрелки навигации для гладиаторского режима */
-        .nav-arrow {
-            background: rgba(255, 65, 108, 0.7);
-            border: 2px solid #ff416c;
-            color: white;
-            cursor: pointer;
-            font-size: 20px;
-            transition: all 0.3s ease;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            z-index: 100;
-            position: absolute;
-        }
-        
-        .nav-arrow:hover {
-            background: rgba(255, 65, 108, 0.9);
-            transform: scale(1.1);
-            box-shadow: 0 0 15px rgba(255, 65, 108, 0.5);
-        }
-        
-        .nav-arrow:disabled {
-            opacity: 0.3;
-            cursor: not-allowed;
-        }
-        
-        .nav-arrow:disabled:hover {
-            transform: none;
-            box-shadow: none;
-        }
-        
-        .left-arrow {
-            left: 0;
-            top: 50%;
-            transform: translateY(-50%);
-            border-radius: 0 10px 10px 0;
-            width: 40px;
-            height: 80px;
-        }
-        
-        .right-arrow {
-            right: 0;
-            top: 50%;
-            transform: translateY(-50%);
-            border-radius: 10px 0 0 10px;
-            width: 40px;
-            height: 80px;
-        }
-        
-        .top-arrow {
-            top: 0;
-            left: 50%;
-            transform: translateX(-50%);
-            border-radius: 0 0 10px 10px;
-            width: 80px;
-            height: 40px;
-        }
-        
-        .bottom-arrow {
-            bottom: 0;
-            left: 50%;
-            transform: translateX(-50%);
-            border-radius: 10px 10px 0 0;
-            width: 80px;
-            height: 40px;
-        }
-        
-        /* Touch events for mobile */
-        .touch-indicator {
-            position: absolute;
-            width: 30px;
-            height: 30px;
-            background: rgba(255, 65, 108, 0.7);
-            border-radius: 50%;
-            pointer-events: none;
-            z-index: 1000;
-            opacity: 0;
-            transition: opacity 0.2s;
-        }
-        
-        .touch-indicator.active {
-            opacity: 1;
-        }
-        
-        /* Цвета для других игроков в гладиаторском режиме */
-        .player3-color {
-            background: linear-gradient(135deg, #ff9800, #ff5722);
-        }
-        
-        .player4-color {
-            background: linear-gradient(135deg, #9c27b0, #673ab7);
-        }
-        
-        .player5-color {
-            background: linear-gradient(135deg, #4caf50, #2e7d32);
-        }
-        
-        .player6-color {
-            background: linear-gradient(135deg, #00bcd4, #00838f);
-        }
-        
-        .player7-color {
-            background: linear-gradient(135deg, #795548, #5d4037);
-        }
-        
-        .player8-color {
-            background: linear-gradient(135deg, #607d8b, #455a64);
+        .danger-zone-level {
+            font-size: 1.5rem;
+            color: #ffcc00;
+            font-weight: bold;
         }
         
         @media (max-width: 1200px) {
@@ -884,6 +863,15 @@
             #gameModes {
                 grid-template-columns: repeat(2, 1fr);
             }
+            
+            #gladiator-grid {
+                grid-template-columns: repeat(3, 1fr);
+                gap: 10px;
+            }
+            
+            .grid-cell-title {
+                font-size: 1rem;
+            }
         }
         
         @media (max-width: 480px) {
@@ -894,6 +882,15 @@
             .stat-value {
                 font-size: 1.4rem;
             }
+            
+            #gladiator-grid {
+                grid-template-columns: repeat(3, 1fr);
+                gap: 5px;
+            }
+            
+            .grid-cell-title {
+                font-size: 0.8rem;
+            }
         }
     </style>
 </head>
@@ -903,9 +900,6 @@
     
     <!-- УВЕДОМЛЕНИЯ -->
     <div id="notification-area"></div>
-    
-    <!-- Индикатор касания для мобильных -->
-    <div class="touch-indicator" id="touch-indicator"></div>
     
     <div class="container">
         <header>
@@ -954,7 +948,6 @@
             </div>
             <div>
                 <button class="btn btn-secondary" onclick="logout()">🚪 Выйти</button>
-                <button class="btn btn-rating" onclick="resetRating()" style="margin-left: 10px; display: none;" id="personalResetBtn">🔄 Сбросить свой рейтинг</button>
                 <button id="adminPanelBtn" class="btn btn-admin" style="display: none; margin-left: 10px;" onclick="toggleAdminPanel()">⚙️ Админ-панель</button>
             </div>
         </div>
@@ -965,7 +958,7 @@
             <div class="btn-group">
                 <button class="btn btn-danger" onclick="clearChat()">🗑️ Очистить чат</button>
                 <button class="btn btn-admin" onclick="viewAllUsers()">👥 Все пользователи</button>
-                <button class="btn btn-danger" id="resetAllRatingBtn" onclick="resetAllUsersRating()" style="display: none;">⚠️ Сбросить рейтинг всем</button>
+                <button class="btn btn-danger" onclick="resetAllUsersRating()">⚠️ Сбросить рейтинг всем</button>
                 <button class="btn btn-secondary" onclick="toggleAdminPanel()">✖️ Закрыть</button>
             </div>
         </div>
@@ -994,16 +987,13 @@
                     <div id="game-status">Игра началась! Ваш ход</div>
                 </div>
                 
-                <div id="board-container">
+                <!-- СЕТКА ГЛАДИАТОРСКОГО РЕЖИМА 3x3 -->
+                <div id="gladiator-grid" style="display: none;">
+                    <!-- Сетка будет заполнена JavaScript -->
+                </div>
+                
+                <div id="board-container" style="display: none;">
                     <div id="board"></div>
-                    
-                    <!-- Стрелки навигации по полям (только для гладиаторского режима) -->
-                    <div id="board-navigation-arrows" style="display: none; position: absolute; width: 100%; height: 100%; top: 0; left: 0; z-index: 50;">
-                        <button class="nav-arrow left-arrow" onclick="moveToAdjacentBoard(-1, 0)" id="left-arrow-btn">←</button>
-                        <button class="nav-arrow right-arrow" onclick="moveToAdjacentBoard(1, 0)" id="right-arrow-btn">→</button>
-                        <button class="nav-arrow top-arrow" onclick="moveToAdjacentBoard(0, -1)" id="top-arrow-btn">↑</button>
-                        <button class="nav-arrow bottom-arrow" onclick="moveToAdjacentBoard(0, 1)" id="bottom-arrow-btn">↓</button>
-                    </div>
                 </div>
                 
                 <div id="game-controls">
@@ -1038,16 +1028,21 @@
                 
                 <!-- ПАНЕЛЬ УПРАВЛЕНИЯ ГЛАДИАТОРСКИМ РЕЖИМОМ -->
                 <div id="gladiator-controls">
-                    <h3>⚔️ Гладиаторский режим</h3>
+                    <h3>⚔️ Гладиаторский режим (Королевская битва)</h3>
+                    
+                    <div class="danger-zone-info">
+                        <div>🔥 Красная зона</div>
+                        <div class="danger-zone-level">Уровень: <span id="danger-zone-level">1</span></div>
+                        <div>Каждые 2 хода расширяется к центру!</div>
+                    </div>
+                    
                     <div id="gladiator-timer">
                         До конца хода: <span id="move-timer">10</span> сек
                     </div>
-                    <div id="gladiator-players">
-                        Игроков в этой игре: <span id="gladiator-players-count">1</span>
-                    </div>
+                    
                     <div class="controls-group">
-                        <button class="btn btn-primary" onclick="findGladiatorGame()">🔍 Найти игру</button>
-                        <button class="btn btn-secondary" onclick="leaveGladiatorGame()">🚪 Покинуть игру</button>
+                        <button class="btn btn-primary" onclick="startGladiatorGame()">🎮 Начать игру</button>
+                        <button class="btn btn-secondary" onclick="leaveGladiatorGame()">🚪 Выйти в меню</button>
                     </div>
                 </div>
             </div>
@@ -1062,8 +1057,11 @@
                         <p>Ваши шашки: <span id="player1-pieces">12</span></p>
                         <p>Шашки соперника: <span id="player2-pieces">12</span></p>
                         <p>Дамки: <span id="kings-count">0</span></p>
-                        <p id="gladiator-info" style="display: none;">Поле: <span id="current-board">1</span>/8 (2x4 сетка)</p>
-                        <p id="online-players-info" style="display: none;">Онлайн игроков: <span id="online-players-count">0</span></p>
+                        <div id="gladiator-stats" style="display: none;">
+                            <p>Выжило: <span id="survivors-count">16</span>/16</p>
+                            <p>Текущее поле: <span id="current-grid-cell">-</span></p>
+                            <p>Красная зона через: <span id="danger-zone-timer">2</span> хода</p>
+                        </div>
                     </div>
                 </div>
                 
@@ -1117,47 +1115,34 @@
         let currentPlayer = 1; // 1 - игрок, 2 - бот
         let gameActive = true;
         let botThinking = false;
-        let moveCount = 0; // Счетчик ходов
+        let moveCount = 0;
         let forcedCaptureChecker = null;
         let chatRef = null;
         let chatListener = null;
         let lastMessageTime = 0;
-        let chatCooldown = 10; // 10 секунд КД
+        let chatCooldown = 10;
         
         // Режимы игры
-        let gameMode = 'normal'; // 'normal', 'giveaway', 'rating', 'gladiator'
-        
-        // Гладиаторский режим
+        let gameMode = 'normal';
         let gladiatorMode = false;
-        let currentBoardIndex = 0;
-        let gladiatorBoards = [];
+        
+        // Гладиаторский режим - новые переменные
+        let gladiatorGrid = []; // 3x3 сетка досок
+        let currentGridRow = 1; // Текущая позиция в сетке (от 0 до 2)
+        let currentGridCol = 1;
+        let dangerZoneLevel = 0; // Уровень красной зоны (0-3)
+        let dangerZoneTimer = 2; // Ходы до расширения красной зоны
+        let totalSurvivors = 16; // Всего объектов в начале
+        let playerSurvivors = 1; // Оставшиеся объекты игрока
+        let botSurvivors = 15; // Оставшиеся боты
         let moveTimer = 10;
         let moveTimerInterval = null;
-        let gladiatorPlayers = new Map(); // Map для хранения других игроков: uid -> {data}
         
         // Для мобильных устройств
-        let touchStartX = 0;
-        let touchStartY = 0;
         let isTouchDevice = 'ontouchstart' in window;
-        
-        // Firebase ссылки для мультиплеера
-        let gladiatorGameRef = null;
-        let gladiatorGameListener = null;
-        let currentGameId = null;
-        let onlinePlayersRef = null;
-        let onlinePlayersListener = null;
-        
-        // Улучшенный ИИ
-        let botMemory = [];
         
         // Администраторы
         const ADMIN_USERS = ['admin', 'administrator', 'супервайзер'];
-        
-        // Цвета для игроков в гладиаторском режиме
-        const PLAYER_COLORS = [
-            'player1', 'player2', 'player3', 'player4', 
-            'player5', 'player6', 'player7', 'player8'
-        ];
         
         // ====================================================
         // ИНИЦИАЛИЗАЦИЯ ПРИ ЗАГРУЗКЕ
@@ -1166,7 +1151,6 @@
             console.log('🔄 Инициализация приложения...');
             
             try {
-                // Инициализация Firebase
                 firebase.initializeApp(firebaseConfig);
                 auth = firebase.auth();
                 database = firebase.database();
@@ -1174,7 +1158,6 @@
                 console.log('✅ Firebase инициализирован');
                 document.getElementById('loading').style.display = 'none';
                 
-                // Слушатель состояния аутентификации
                 auth.onAuthStateChanged((user) => {
                     if (user) {
                         console.log('✅ Пользователь авторизован:', user.uid);
@@ -1185,14 +1168,7 @@
                     }
                 });
                 
-                // Настройка обработчиков клавиш
                 setupEventListeners();
-                
-                // Инициализация гладиаторских досок
-                initGladiatorBoards();
-                
-                // Настройка touch-событий для мобильных
-                setupTouchEvents();
                 
             } catch (error) {
                 console.error('❌ Ошибка инициализации Firebase:', error);
@@ -1212,58 +1188,6 @@
             document.getElementById('message')?.addEventListener('keypress', function(e) {
                 if (e.key === 'Enter') sendMessage();
             });
-        }
-        
-        function setupTouchEvents() {
-            if (!isTouchDevice) return;
-            
-            const board = document.getElementById('board');
-            if (!board) return;
-            
-            // Обработка touch-событий
-            board.addEventListener('touchstart', handleTouchStart, { passive: false });
-            board.addEventListener('touchmove', handleTouchMove, { passive: false });
-            board.addEventListener('touchend', handleTouchEnd, { passive: false });
-            
-            console.log('📱 Touch events настроены для мобильных устройств');
-        }
-        
-        function handleTouchStart(e) {
-            if (!gameActive || botThinking || currentPlayer !== 1) return;
-            
-            const touch = e.touches[0];
-            touchStartX = touch.clientX;
-            touchStartY = touch.clientY;
-            
-            // Находим клетку по координатам
-            const cell = document.elementFromPoint(touch.clientX, touch.clientY);
-            if (cell && cell.classList.contains('cell')) {
-                const row = parseInt(cell.dataset.row);
-                const col = parseInt(cell.dataset.col);
-                
-                // Показываем индикатор касания
-                const indicator = document.getElementById('touch-indicator');
-                const rect = cell.getBoundingClientRect();
-                indicator.style.left = (rect.left + rect.width / 2 - 15) + 'px';
-                indicator.style.top = (rect.top + rect.height / 2 - 15) + 'px';
-                indicator.classList.add('active');
-                
-                // Имитируем клик после небольшой задержки
-                setTimeout(() => {
-                    handleCellClick(row, col);
-                    indicator.classList.remove('active');
-                }, 100);
-            }
-            
-            e.preventDefault();
-        }
-        
-        function handleTouchMove(e) {
-            e.preventDefault();
-        }
-        
-        function handleTouchEnd(e) {
-            e.preventDefault();
         }
         
         function handleMessageKeyPress(event) {
@@ -1391,56 +1315,31 @@
         
         async function logout() {
             try {
-                // Отписываемся от чата
                 if (chatListener) {
                     chatRef.off('value', chatListener);
                     chatListener = null;
                 }
                 
-                // Отписываемся от игры гладиатора
-                if (gladiatorGameListener && gladiatorGameRef) {
-                    gladiatorGameRef.off('value', gladiatorGameListener);
-                    gladiatorGameListener = null;
-                }
-                
-                // Отписываемся от онлайн игроков
-                if (onlinePlayersListener && onlinePlayersRef) {
-                    onlinePlayersRef.off('value', onlinePlayersListener);
-                    onlinePlayersListener = null;
-                }
-                
-                // Останавливаем таймер
                 if (moveTimerInterval) {
                     clearInterval(moveTimerInterval);
                     moveTimerInterval = null;
                 }
                 
-                // Обновляем статус пользователя
                 if (currentUser && auth.currentUser) {
                     await database.ref('users/' + currentUser.uid).update({
                         status: 'offline',
                         lastOnline: firebase.database.ServerValue.TIMESTAMP
                     });
-                    
-                    // Выходим из гладиаторской игры
-                    if (currentGameId) {
-                        await leaveGladiatorGameFromServer();
-                    }
                 }
                 
-                // Выходим из Firebase
                 await auth.signOut();
                 
-                // Сбрасываем все переменные
                 currentUser = null;
                 gameActive = false;
                 botThinking = false;
                 selectedChecker = null;
                 boardState = [];
-                currentGameId = null;
-                gladiatorPlayers.clear();
                 
-                // Показываем экран аутентификации
                 showAuthScreen();
                 showNotification('✅ Вы вышли из системы');
                 
@@ -1451,44 +1350,9 @@
             }
         }
         
-        async function leaveGladiatorGameFromServer() {
-            if (!currentGameId || !currentUser) return;
-            
-            try {
-                const playerRef = database.ref(`gladiator/games/${currentGameId}/players/${currentUser.uid}`);
-                await playerRef.remove();
-                
-                // Обновляем счетчик игроков
-                const gameRef = database.ref(`gladiator/games/${currentGameId}`);
-                const snapshot = await gameRef.once('value');
-                const gameData = snapshot.val();
-                
-                if (gameData && gameData.players) {
-                    const playerCount = Object.keys(gameData.players).length;
-                    if (playerCount === 0) {
-                        // Если игроков не осталось, удаляем игру
-                        await gameRef.remove();
-                    } else {
-                        // Обновляем счетчик
-                        await gameRef.update({ playerCount: playerCount });
-                    }
-                }
-                
-                console.log('🚪 Игрок вышел из гладиаторской игры');
-            } catch (error) {
-                console.error('❌ Ошибка выхода из игры:', error);
-            }
-        }
-        
         function toggleAdminPanel() {
             const panel = document.getElementById('admin-panel');
             panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
-            
-            // Показываем кнопку сброса рейтинга только админу
-            const resetBtn = document.getElementById('resetAllRatingBtn');
-            if (currentUser?.isAdmin) {
-                resetBtn.style.display = 'inline-block';
-            }
         }
         
         async function clearChat() {
@@ -1588,48 +1452,24 @@
         // УПРАВЛЕНИЕ РЕЖИМАМИ ИГРЫ
         // ====================================================
         function setGameMode(mode) {
-            // Если выходим из гладиаторского режима
+            // Исправление бага: при переключении режимов сбрасываем состояние
             if (gladiatorMode && mode !== 'gladiator') {
-                // Останавливаем таймер
+                // Выходим из гладиаторского режима
                 if (moveTimerInterval) {
                     clearInterval(moveTimerInterval);
                     moveTimerInterval = null;
                 }
                 
-                // Отписываемся от игры
-                if (gladiatorGameListener && gladiatorGameRef) {
-                    gladiatorGameRef.off('value', gladiatorGameListener);
-                    gladiatorGameListener = null;
-                }
-                
-                // Отписываемся от онлайн игроков
-                if (onlinePlayersListener && onlinePlayersRef) {
-                    onlinePlayersRef.off('value', onlinePlayersListener);
-                    onlinePlayersListener = null;
-                }
-                
-                // Сбрасываем состояние
                 gladiatorMode = false;
-                currentBoardIndex = 0;
-                gladiatorBoards = [];
-                gladiatorPlayers.clear();
-                
-                // Скрываем навигацию
-                document.getElementById('board-navigation-arrows').style.display = 'none';
-                document.getElementById('gladiator-info').style.display = 'none';
-                document.getElementById('online-players-info').style.display = 'none';
-                
-                // Выходим из игры на сервере
-                if (currentGameId) {
-                    leaveGladiatorGameFromServer();
-                    currentGameId = null;
-                }
+                document.getElementById('gladiator-grid').style.display = 'none';
+                document.getElementById('board-container').style.display = 'block';
+                document.getElementById('gladiator-controls').style.display = 'none';
+                document.getElementById('gladiator-stats').style.display = 'none';
             }
             
             gameMode = mode;
             gladiatorMode = (mode === 'gladiator');
             
-            // Обновляем UI кнопок
             document.querySelectorAll('.mode-btn').forEach(btn => {
                 btn.classList.remove('active', 'rating-active', 'gladiator-active');
             });
@@ -1638,7 +1478,6 @@
             if (mode === 'rating') activeClass = 'rating-active';
             if (mode === 'gladiator') activeClass = 'gladiator-active';
             
-            // Находим нужную кнопку
             const modeButtons = document.querySelectorAll('.mode-btn');
             for (let btn of modeButtons) {
                 if (btn.textContent.includes(getModeName(mode))) {
@@ -1647,7 +1486,6 @@
                 }
             }
             
-            // Обновляем отображение режима
             const modeNames = {
                 'normal': 'Обычные шашки',
                 'giveaway': 'Поддавки',
@@ -1656,48 +1494,36 @@
             };
             
             document.getElementById('game-mode-display').textContent = modeNames[mode];
-            document.getElementById('gladiator-info').style.display = gladiatorMode ? 'block' : 'none';
-            document.getElementById('online-players-info').style.display = gladiatorMode ? 'block' : 'none';
             
-            // Настройки для разных режимов
             if (mode === 'rating') {
                 document.getElementById('bot-controls').style.display = 'none';
                 document.getElementById('player2-rating').textContent = 'Уровень: 👑 Эксперт';
                 document.getElementById('botDifficulty').value = 'expert';
                 document.getElementById('gladiator-controls').style.display = 'none';
-                document.getElementById('board-navigation-arrows').style.display = 'none';
                 showNotification('🏆 Рейтинговая игра! Сложность: эксперт');
             } else if (mode === 'gladiator') {
                 document.getElementById('bot-controls').style.display = 'none';
                 document.getElementById('gladiator-controls').style.display = 'block';
-                document.getElementById('board-navigation-arrows').style.display = 'block';
+                document.getElementById('gladiator-stats').style.display = 'block';
                 
-                // В гладиаторском режиме противники - другие игроки
-                document.getElementById('player2-name').textContent = 'Другие игроки';
-                document.getElementById('player2-rating').textContent = 'Режим: Онлайн';
+                document.getElementById('player2-name').textContent = '15 ботов';
+                document.getElementById('player2-rating').textContent = 'Королевская битва';
                 
-                // Обновляем информацию о поле
-                const row = Math.floor(currentBoardIndex / 4);
-                const col = currentBoardIndex % 4;
-                document.getElementById('current-board').textContent = `${currentBoardIndex + 1} (${row + 1},${col + 1})`;
+                // Создаем сетку 3x3
+                createGladiatorGrid();
                 
-                // Начинаем гладиаторский режим
-                startGladiatorMode();
-                showNotification('⚔️ Гладиаторский режим! 8 полей, 10 секунд на ход');
-                
-                // Загружаем онлайн игроков
-                loadOnlinePlayers();
+                showNotification('⚔️ Гладиаторский режим! 9 полей, королевская битва с ботами');
             } else {
                 document.getElementById('bot-controls').style.display = 'block';
                 document.getElementById('gladiator-controls').style.display = 'none';
-                document.getElementById('board-navigation-arrows').style.display = 'none';
+                document.getElementById('gladiator-stats').style.display = 'none';
                 document.getElementById('player2-name').textContent = 'Бот';
                 updateBotLevel();
             }
             
             showNotification(`✅ Режим изменен: ${modeNames[mode]}`);
             
-            // Начинаем новую игру
+            // Начинаем новую игру с правильной инициализацией
             startNewGame();
         }
         
@@ -1712,14 +1538,631 @@
         }
         
         // ====================================================
-        // ИГРОВАЯ ЛОГИКА
+        // ГЛАДИАТОРСКИЙ РЕЖИМ - НОВАЯ РЕАЛИЗАЦИЯ
+        // ====================================================
+        function createGladiatorGrid() {
+            const grid = document.getElementById('gladiator-grid');
+            grid.innerHTML = '';
+            gladiatorGrid = [];
+            
+            const gridNames = [
+                ['Верх-Левый', 'Верх-Центр', 'Верх-Правый'],
+                ['Центр-Левый', 'ЦЕНТР', 'Центр-Правый'],
+                ['Низ-Левый', 'Низ-Центр', 'Низ-Правый']
+            ];
+            
+            for (let row = 0; row < 3; row++) {
+                gladiatorGrid[row] = [];
+                for (let col = 0; col < 3; col++) {
+                    const cell = document.createElement('div');
+                    cell.className = 'grid-cell';
+                    if (row === 1 && col === 1) {
+                        cell.classList.add('center');
+                    }
+                    
+                    cell.dataset.row = row;
+                    cell.dataset.col = col;
+                    
+                    cell.addEventListener('click', function() {
+                        const row = parseInt(this.dataset.row);
+                        const col = parseInt(this.dataset.col);
+                        selectGridCell(row, col);
+                    });
+                    
+                    const content = document.createElement('div');
+                    content.className = 'grid-cell-content';
+                    
+                    const title = document.createElement('div');
+                    title.className = 'grid-cell-title';
+                    title.textContent = gridNames[row][col];
+                    
+                    const stats = document.createElement('div');
+                    stats.className = 'grid-cell-stats';
+                    stats.id = `grid-stats-${row}-${col}`;
+                    
+                    if (row === 1 && col === 1) {
+                        stats.textContent = 'Безопасная зона';
+                    } else {
+                        stats.innerHTML = '<span class="cell-player"></span> x1 <span class="cell-bot"></span> x15';
+                    }
+                    
+                    content.appendChild(title);
+                    content.appendChild(stats);
+                    cell.appendChild(content);
+                    
+                    grid.appendChild(cell);
+                    gladiatorGrid[row][col] = {
+                        board: getEmptyBoard(),
+                        playerCount: 0,
+                        botCount: 0
+                    };
+                }
+            }
+            
+            grid.style.display = 'grid';
+            document.getElementById('board-container').style.display = 'none';
+        }
+        
+        function selectGridCell(row, col) {
+            if (!gladiatorMode || !gameActive) return;
+            
+            // Снимаем выделение со всех ячеек
+            document.querySelectorAll('.grid-cell').forEach(cell => {
+                cell.classList.remove('active');
+            });
+            
+            // Выделяем выбранную ячейку
+            const selectedCell = document.querySelector(`.grid-cell[data-row="${row}"][data-col="${col}"]`);
+            selectedCell.classList.add('active');
+            
+            currentGridRow = row;
+            currentGridCol = col;
+            
+            // Загружаем доску для выбранной ячейки
+            boardState = JSON.parse(JSON.stringify(gladiatorGrid[row][col].board));
+            
+            // Обновляем отображение
+            document.getElementById('current-grid-cell').textContent = 
+                `(${row+1},${col+1}) - ${getGridCellName(row, col)}`;
+            
+            // Показываем доску
+            document.getElementById('gladiator-grid').style.display = 'none';
+            document.getElementById('board-container').style.display = 'block';
+            
+            updateBoardUI();
+            updateGameStats();
+            
+            showNotification(`Переключение на поле (${row+1},${col+1})`);
+        }
+        
+        function getGridCellName(row, col) {
+            if (row === 0 && col === 0) return 'Верх-Левый';
+            if (row === 0 && col === 1) return 'Верх-Центр';
+            if (row === 0 && col === 2) return 'Верх-Правый';
+            if (row === 1 && col === 0) return 'Центр-Левый';
+            if (row === 1 && col === 1) return 'ЦЕНТР';
+            if (row === 1 && col === 2) return 'Центр-Правый';
+            if (row === 2 && col === 0) return 'Низ-Левый';
+            if (row === 2 && col === 1) return 'Низ-Центр';
+            if (row === 2 && col === 2) return 'Низ-Правый';
+            return 'Неизвестно';
+        }
+        
+        function startGladiatorGame() {
+            console.log('⚔️ Начало гладиаторской игры');
+            
+            // Инициализация сетки
+            initGladiatorGrid();
+            
+            // Выбираем случайную стартовую позицию для игрока (не центр)
+            let startRow, startCol;
+            do {
+                startRow = Math.floor(Math.random() * 3);
+                startCol = Math.floor(Math.random() * 3);
+            } while (startRow === 1 && startCol === 1);
+            
+            // Устанавливаем игрока в выбранную ячейку
+            placePlayerInGridCell(startRow, startCol);
+            
+            // Размещаем ботов в остальных ячейках (кроме центра)
+            placeBotsInGrid();
+            
+            // Обновляем статистику
+            updateGladiatorStats();
+            
+            // Выбираем стартовую ячейку
+            selectGridCell(startRow, startCol);
+            
+            // Запускаем таймер
+            if (moveTimerInterval) {
+                clearInterval(moveTimerInterval);
+            }
+            
+            moveTimer = 10;
+            document.getElementById('move-timer').textContent = moveTimer;
+            
+            moveTimerInterval = setInterval(() => {
+                moveTimer--;
+                document.getElementById('move-timer').textContent = moveTimer;
+                
+                if (moveTimer <= 0) {
+                    // Ход переходит боту
+                    if (currentPlayer === 1) {
+                        currentPlayer = 2;
+                        updatePlayerCards();
+                        makeGladiatorBotMoves();
+                    }
+                    
+                    moveTimer = 10;
+                    document.getElementById('move-timer').textContent = moveTimer;
+                }
+            }, 1000);
+            
+            gameActive = true;
+            currentPlayer = 1;
+            updatePlayerCards();
+            
+            showNotification('⚔️ Гладиаторская битва началась! У вас 10 секунд на ход.');
+        }
+        
+        function initGladiatorGrid() {
+            dangerZoneLevel = 0;
+            dangerZoneTimer = 2;
+            totalSurvivors = 16;
+            playerSurvivors = 1;
+            botSurvivors = 15;
+            
+            // Очищаем все доски
+            for (let row = 0; row < 3; row++) {
+                for (let col = 0; col < 3; col++) {
+                    gladiatorGrid[row][col] = {
+                        board: getEmptyBoard(),
+                        playerCount: 0,
+                        botCount: 0
+                    };
+                }
+            }
+        }
+        
+        function placePlayerInGridCell(row, col) {
+            const board = gladiatorGrid[row][col].board;
+            
+            // Размещаем игрока у границы в зависимости от положения ячейки
+            let playerRow, playerCol;
+            
+            if (row === 0) { // Верхний ряд
+                playerRow = 1; // Вторая строка от верха
+                if (col === 0) playerCol = 1; // Левая граница
+                else if (col === 1) playerCol = 3; // Центр сверху
+                else playerCol = 6; // Правая граница
+            } else if (row === 2) { // Нижний ряд
+                playerRow = 6; // Вторая строка снизу
+                if (col === 0) playerCol = 1;
+                else if (col === 1) playerCol = 3;
+                else playerCol = 6;
+            } else { // Центральный ряд
+                playerRow = 3;
+                if (col === 0) playerCol = 1; // Левая граница
+                else playerCol = 6; // Правая граница
+            }
+            
+            // Убедимся, что клетка черная
+            if ((playerRow + playerCol) % 2 === 0) {
+                playerCol++; // Сдвигаем на черную клетку
+            }
+            
+            board[playerRow][playerCol] = 1; // Игрок
+            gladiatorGrid[row][col].playerCount = 1;
+            gladiatorGrid[row][col].botCount = 0;
+            
+            updateGridStats();
+        }
+        
+        function placeBotsInGrid() {
+            let botsPlaced = 0;
+            const totalBots = 15;
+            
+            // Распределяем ботов по ячейкам (кроме центра)
+            for (let row = 0; row < 3; row++) {
+                for (let col = 0; col < 3; col++) {
+                    if (row === 1 && col === 1) continue; // Пропускаем центр
+                    
+                    const board = gladiatorGrid[row][col].board;
+                    let botsInCell = 0;
+                    
+                    // В каждой ячейке размещаем 1-2 ботов
+                    const botsToPlace = Math.min(2, totalBots - botsPlaced);
+                    
+                    for (let i = 0; i < botsToPlace; i++) {
+                        let botRow, botCol;
+                        let attempts = 0;
+                        
+                        // Размещаем бота у противоположной границы от игрока
+                        do {
+                            if (row === 0) botRow = 6; // Низ доски
+                            else if (row === 2) botRow = 1; // Верх доски
+                            else botRow = Math.random() < 0.5 ? 1 : 6;
+                            
+                            if (col === 0) botCol = 6; // Правая граница
+                            else if (col === 2) botCol = 1; // Левая граница
+                            else botCol = Math.random() < 0.5 ? 1 : 6;
+                            
+                            // Случайное смещение
+                            botRow += Math.floor(Math.random() * 3) - 1;
+                            botCol += Math.floor(Math.random() * 3) - 1;
+                            
+                            // Ограничиваем границы
+                            botRow = Math.max(0, Math.min(7, botRow));
+                            botCol = Math.max(0, Math.min(7, botCol));
+                            
+                            attempts++;
+                            if (attempts > 50) break;
+                        } while (!isValidPosition(botRow, botCol) || 
+                                 board[botRow][botCol] !== 0 || 
+                                 (botRow + botCol) % 2 === 0);
+                        
+                        if (attempts <= 50) {
+                            board[botRow][botCol] = 2; // Бот
+                            botsInCell++;
+                            botsPlaced++;
+                        }
+                    }
+                    
+                    gladiatorGrid[row][col].botCount = botsInCell;
+                    
+                    if (botsPlaced >= totalBots) break;
+                }
+                if (botsPlaced >= totalBots) break;
+            }
+            
+            updateGridStats();
+        }
+        
+        function updateGridStats() {
+            for (let row = 0; row < 3; row++) {
+                for (let col = 0; col < 3; col++) {
+                    const stats = document.getElementById(`grid-stats-${row}-${col}`);
+                    const cell = gladiatorGrid[row][col];
+                    
+                    if (row === 1 && col === 1) {
+                        stats.textContent = 'Безопасная зона';
+                    } else {
+                        stats.innerHTML = 
+                            `<span class="cell-player"></span> x${cell.playerCount} ` +
+                            `<span class="cell-bot"></span> x${cell.botCount}`;
+                    }
+                }
+            }
+        }
+        
+        function updateGladiatorStats() {
+            document.getElementById('survivors-count').textContent = totalSurvivors;
+            document.getElementById('danger-zone-level').textContent = dangerZoneLevel;
+            document.getElementById('danger-zone-timer').textContent = dangerZoneTimer;
+            
+            // Обновляем статистику по ячейкам
+            updateGridStats();
+        }
+        
+        function makeGladiatorBotMoves() {
+            if (!gameActive || currentPlayer !== 2 || botThinking) return;
+            
+            botThinking = true;
+            
+            // Собираем всех ботов со всех досок
+            const allBots = [];
+            
+            for (let gridRow = 0; gridRow < 3; gridRow++) {
+                for (let gridCol = 0; gridCol < 3; gridCol++) {
+                    const board = gladiatorGrid[gridRow][gridCol].board;
+                    
+                    for (let row = 0; row < 8; row++) {
+                        for (let col = 0; col < 8; col++) {
+                            if (board[row][col] === 2) {
+                                allBots.push({
+                                    gridRow,
+                                    gridCol,
+                                    row,
+                                    col,
+                                    board: board
+                                });
+                            }
+                        }
+                    }
+                }
+            }
+            
+            if (allBots.length === 0) {
+                botThinking = false;
+                checkGladiatorGameEnd();
+                return;
+            }
+            
+            // Каждый бот делает ход
+            let botIndex = 0;
+            
+            function makeNextBotMove() {
+                if (botIndex >= allBots.length) {
+                    // Все боты походили
+                    botThinking = false;
+                    currentPlayer = 1;
+                    updatePlayerCards();
+                    
+                    // Уменьшаем таймер красной зоны
+                    dangerZoneTimer--;
+                    if (dangerZoneTimer <= 0) {
+                        expandDangerZone();
+                        dangerZoneTimer = 2;
+                    }
+                    
+                    updateGladiatorStats();
+                    checkGladiatorGameEnd();
+                    return;
+                }
+                
+                const bot = allBots[botIndex];
+                const moves = getGladiatorAvailableMoves(bot.row, bot.col, bot.board, 2);
+                
+                if (moves.length > 0) {
+                    // Выбираем лучший ход
+                    const bestMove = getBestGladiatorBotMove(moves, bot.board, bot.row, bot.col);
+                    
+                    // Выполняем ход
+                    const newBoard = JSON.parse(JSON.stringify(bot.board));
+                    newBoard[bot.row][bot.col] = 0;
+                    newBoard[bestMove.row][bestMove.col] = 2;
+                    
+                    // Обновляем доску в сетке
+                    gladiatorGrid[bot.gridRow][bot.gridCol].board = newBoard;
+                    
+                    // Если ходим на другой доске
+                    if (bestMove.newGridRow !== undefined && bestMove.newGridCol !== undefined) {
+                        // Удаляем с текущей доски
+                        gladiatorGrid[bot.gridRow][bot.gridCol].botCount--;
+                        // Добавляем на новую доску
+                        gladiatorGrid[bestMove.newGridRow][bestMove.newGridCol].botCount++;
+                        gladiatorGrid[bestMove.newGridRow][bestMove.newGridCol].board[bestMove.row][bestMove.col] = 2;
+                    }
+                    
+                    // Если было взятие
+                    if (bestMove.isCapture) {
+                        newBoard[bestMove.captureRow][bestMove.captureCol] = 0;
+                        totalSurvivors--;
+                        botSurvivors--;
+                        
+                        // Проверяем, был ли это игрок
+                        const originalBoard = gladiatorGrid[bot.gridRow][bot.gridCol].board;
+                        if (originalBoard[bestMove.captureRow][bestMove.captureCol] === 1) {
+                            playerSurvivors = 0;
+                            gladiatorGrid[bot.gridRow][bot.gridCol].playerCount = 0;
+                        }
+                    }
+                }
+                
+                botIndex++;
+                setTimeout(makeNextBotMove, 100); // Небольшая задержка между ходами ботов
+            }
+            
+            makeNextBotMove();
+        }
+        
+        function getGladiatorAvailableMoves(row, col, board, player) {
+            const moves = [];
+            const piece = board[row][col];
+            
+            if (piece === 0 || piece !== player) return moves;
+            
+            // В гладиаторском режиме шашки ходят во всех направлениях
+            const directions = [
+                { dr: -1, dc: -1 },
+                { dr: -1, dc: 1 },
+                { dr: 1, dc: -1 },
+                { dr: 1, dc: 1 }
+            ];
+            
+            // Проверяем обычные ходы
+            for (const dir of directions) {
+                const newRow = row + dir.dr;
+                const newCol = col + dir.dc;
+                
+                if (isValidPosition(newRow, newCol) && board[newRow][newCol] === 0) {
+                    // Проверяем красную зону
+                    if (!isDangerZone(newRow, newCol)) {
+                        moves.push({ 
+                            row: newRow, 
+                            col: newCol, 
+                            isCapture: false,
+                            direction: dir
+                        });
+                    }
+                }
+            }
+            
+            // Проверяем взятия
+            const enemy = player === 1 ? 2 : 1;
+            
+            for (const dir of directions) {
+                const jumpRow = row + dir.dr * 2;
+                const jumpCol = col + dir.dc * 2;
+                const middleRow = row + dir.dr;
+                const middleCol = col + dir.dc;
+                
+                if (isValidPosition(jumpRow, jumpCol) && 
+                    board[jumpRow][jumpCol] === 0 &&
+                    isValidPosition(middleRow, middleCol)) {
+                    
+                    const middlePiece = board[middleRow][middleCol];
+                    if (middlePiece === enemy && !isDangerZone(jumpRow, jumpCol)) {
+                        moves.push({ 
+                            row: jumpRow, 
+                            col: jumpCol, 
+                            isCapture: true,
+                            captureRow: middleRow,
+                            captureCol: middleCol,
+                            direction: dir
+                        });
+                    }
+                }
+            }
+            
+            return moves;
+        }
+        
+        function getBestGladiatorBotMove(moves, board, fromRow, fromCol) {
+            if (moves.length === 0) return null;
+            
+            let bestMove = moves[0];
+            let bestScore = -Infinity;
+            
+            moves.forEach(move => {
+                let score = 0;
+                
+                // Приоритет взятия
+                if (move.isCapture) {
+                    score += 50;
+                    
+                    // Бонус за взятие игрока
+                    if (board[move.captureRow][move.captureCol] === 1) {
+                        score += 100;
+                    }
+                }
+                
+                // Двигаться к центру (избегать красной зоны)
+                const centerDistance = Math.abs(move.row - 3.5) + Math.abs(move.col - 3.5);
+                score += (8 - centerDistance) * 2;
+                
+                // Избегать границ (красная зона)
+                if (move.row <= dangerZoneLevel || move.row >= 7 - dangerZoneLevel ||
+                    move.col <= dangerZoneLevel || move.col >= 7 - dangerZoneLevel) {
+                    score -= 30;
+                }
+                
+                // Бонус за движение к центру сетки (если на границе доски)
+                if (fromRow === 0 && move.row === 0) {
+                    // Может перейти на другую доску
+                    score += 20;
+                }
+                
+                if (score > bestScore) {
+                    bestScore = score;
+                    bestMove = move;
+                }
+            });
+            
+            return bestMove;
+        }
+        
+        function expandDangerZone() {
+            dangerZoneLevel++;
+            
+            // Удаляем шашки в красной зоне
+            for (let gridRow = 0; gridRow < 3; gridRow++) {
+                for (let gridCol = 0; gridCol < 3; gridCol++) {
+                    const board = gladiatorGrid[gridRow][gridCol].board;
+                    
+                    for (let row = 0; row < 8; row++) {
+                        for (let col = 0; col < 8; col++) {
+                            if (isDangerZone(row, col) && board[row][col] !== 0) {
+                                const piece = board[row][col];
+                                board[row][col] = 0;
+                                
+                                if (piece === 1) {
+                                    playerSurvivors = 0;
+                                    gladiatorGrid[gridRow][gridCol].playerCount = 0;
+                                } else if (piece === 2) {
+                                    gladiatorGrid[gridRow][gridCol].botCount--;
+                                    botSurvivors--;
+                                }
+                                
+                                totalSurvivors--;
+                            }
+                        }
+                    }
+                }
+            }
+            
+            // Обновляем отображение красной зоны
+            updateDangerZoneDisplay();
+            
+            showNotification(`🔥 Красная зона расширилась! Уровень: ${dangerZoneLevel}`);
+        }
+        
+        function isDangerZone(row, col) {
+            return row < dangerZoneLevel || row >= 8 - dangerZoneLevel ||
+                   col < dangerZoneLevel || col >= 8 - dangerZoneLevel;
+        }
+        
+        function updateDangerZoneDisplay() {
+            // Обновляем ячейки сетки
+            document.querySelectorAll('.grid-cell').forEach(cell => {
+                const row = parseInt(cell.dataset.row);
+                const col = parseInt(cell.dataset.col);
+                
+                cell.classList.remove('danger');
+                
+                // Отмечаем опасные ячейки (внешние)
+                if (dangerZoneLevel > 0) {
+                    if (row === 0 || row === 2 || col === 0 || col === 2) {
+                        cell.classList.add('danger');
+                    }
+                }
+            });
+            
+            // Обновляем доску, если она открыта
+            if (document.getElementById('board-container').style.display !== 'none') {
+                updateBoardUI();
+            }
+        }
+        
+        function checkGladiatorGameEnd() {
+            if (playerSurvivors <= 0) {
+                endGame('Вы проиграли в гладиаторской битве!');
+                return;
+            }
+            
+            if (botSurvivors <= 0) {
+                endGame('🎉 Вы победили в гладиаторской битве!');
+                return;
+            }
+            
+            if (totalSurvivors <= 1) {
+                if (playerSurvivors > 0) {
+                    endGame('🎉 Вы победили в гладиаторской битве!');
+                } else {
+                    endGame('Вы проиграли в гладиаторской битве!');
+                }
+                return;
+            }
+            
+            // Обновляем статистику
+            updateGladiatorStats();
+            updateGridStats();
+        }
+        
+        function leaveGladiatorGame() {
+            if (moveTimerInterval) {
+                clearInterval(moveTimerInterval);
+                moveTimerInterval = null;
+            }
+            
+            // Возвращаемся к сетке
+            document.getElementById('gladiator-grid').style.display = 'grid';
+            document.getElementById('board-container').style.display = 'none';
+            
+            gameActive = false;
+            showNotification('Выход из гладиаторской игры');
+        }
+        
+        // ====================================================
+        // ОСНОВНАЯ ИГРОВАЯ ЛОГИКА (ДЛЯ ВСЕХ РЕЖИМОВ)
         // ====================================================
         function initBoard() {
             const board = document.getElementById('board');
             board.innerHTML = '';
             
-            if (gladiatorMode) {
-                boardState = gladiatorBoards[currentBoardIndex];
+            // Для гладиаторского режима используем текущую доску из сетки
+            if (gladiatorMode && gladiatorGrid[currentGridRow] && gladiatorGrid[currentGridRow][currentGridCol]) {
+                boardState = JSON.parse(JSON.stringify(gladiatorGrid[currentGridRow][currentGridCol].board));
             } else {
                 boardState = getInitialBoard();
             }
@@ -1728,51 +2171,29 @@
                 for (let col = 0; col < 8; col++) {
                     const cell = document.createElement('div');
                     
-                    cell.className = `cell ${(row + col) % 2 === 0 ? 'light' : 'dark'}`;
+                    let cellClass = `cell ${(row + col) % 2 === 0 ? 'light' : 'dark'}`;
+                    
+                    // Добавляем класс красной зоны для гладиаторского режима
+                    if (gladiatorMode && isDangerZone(row, col)) {
+                        cellClass += ' danger-zone';
+                    }
+                    
+                    cell.className = cellClass;
                     cell.dataset.row = row;
                     cell.dataset.col = col;
                     
-                    // Добавляем обработчики для мобильных и десктопов
-                    if (isTouchDevice) {
-                        cell.addEventListener('touchstart', function(e) {
-                            e.preventDefault();
-                            const row = parseInt(this.dataset.row);
-                            const col = parseInt(this.dataset.col);
-                            handleCellClick(row, col);
-                        });
-                    } else {
-                        cell.addEventListener('click', function() {
-                            const row = parseInt(this.dataset.row);
-                            const col = parseInt(this.dataset.col);
-                            handleCellClick(row, col);
-                        });
-                    }
+                    cell.addEventListener('click', function() {
+                        const row = parseInt(this.dataset.row);
+                        const col = parseInt(this.dataset.col);
+                        handleCellClick(row, col);
+                    });
                     
                     const piece = boardState[row][col];
                     if (piece !== 0) {
                         const checker = document.createElement('div');
-                        let playerClass = 'player1';
-                        if (piece >= 100) {
-                            // Это другой игрок в гладиаторском режиме
-                            playerClass = PLAYER_COLORS[piece % 100] || 'player3';
-                        } else if (piece === 2 || piece === 4) {
-                            playerClass = 'player2';
-                        }
-                        
-                        checker.className = `checker ${playerClass}${piece > 2 && piece < 100 ? ' king' : ''}`;
+                        checker.className = `checker player${piece === 1 || piece === 3 ? '1' : '2'}${piece > 2 ? ' king' : ''}`;
                         checker.dataset.row = row;
                         checker.dataset.col = col;
-                        
-                        // Для мобильных устройств добавляем touch-обработчик
-                        if (isTouchDevice) {
-                            checker.addEventListener('touchstart', function(e) {
-                                e.preventDefault();
-                                e.stopPropagation();
-                                const row = parseInt(this.dataset.row);
-                                const col = parseInt(this.dataset.col);
-                                handleCellClick(row, col);
-                            });
-                        }
                         
                         cell.appendChild(checker);
                     }
@@ -1791,7 +2212,7 @@
             for (let row = 5; row < 8; row++) {
                 for (let col = 0; col < 8; col++) {
                     if ((row + col) % 2 === 1) {
-                        board[row][col] = 1; // Шашки игрока
+                        board[row][col] = 1;
                     }
                 }
             }
@@ -1799,7 +2220,7 @@
             for (let row = 0; row < 3; row++) {
                 for (let col = 0; col < 8; col++) {
                     if ((row + col) % 2 === 1) {
-                        board[row][col] = 2; // Шашки бота
+                        board[row][col] = 2;
                     }
                 }
             }
@@ -1807,17 +2228,24 @@
             return board;
         }
         
+        function getEmptyBoard() {
+            return Array(8).fill().map(() => Array(8).fill(0));
+        }
+        
         function handleCellClick(row, col) {
             if (!gameActive || botThinking || currentPlayer !== 1) {
                 return;
             }
             
+            // В гладиаторском режиме проверяем красную зону
+            if (gladiatorMode && isDangerZone(row, col)) {
+                showNotification('⚠️ Нельзя ходить в красную зону!');
+                return;
+            }
+            
             const piece = boardState[row][col];
             
-            // Проверяем, это ли наша шашка (1 или 3) или шашка другого игрока в гладиаторском режиме
-            const isOurPiece = (piece === 1 || piece === 3);
-            
-            if (isOurPiece) {
+            if (piece === 1 || piece === 3) {
                 const allCaptures = getAllCapturesForPlayer(1);
                 
                 if (allCaptures.length > 0) {
@@ -1856,7 +2284,13 @@
             clearSelection();
             
             selectedChecker = { row, col };
-            availableMoves = getAvailableMoves(row, col);
+            
+            // В гладиаторском режиме используем специальную функцию
+            if (gladiatorMode) {
+                availableMoves = getGladiatorAvailableMoves(row, col, boardState, 1);
+            } else {
+                availableMoves = getAvailableMoves(row, col);
+            }
             
             const cell = document.querySelector(`.cell[data-row="${row}"][data-col="${col}"]`);
             if (cell) {
@@ -1899,7 +2333,7 @@
             const piece = boardState[row][col];
             const moves = [];
             
-            if (piece === 0 || piece >= 100) return moves; // Пустая клетка или шашка другого игрока
+            if (piece === 0) return moves;
             
             const isKing = piece > 2;
             const player = piece === 1 || piece === 3 ? 1 : 2;
@@ -1938,6 +2372,7 @@
                 if (player === 1) {
                     directions.push({ dr: -1, dc: -1 });
                     directions.push({ dr: -1, dc: 1 });
+                    // В обычном режиме не ходим назад
                 } else {
                     directions.push({ dr: 1, dc: -1 });
                     directions.push({ dr: 1, dc: 1 });
@@ -1987,7 +2422,7 @@
             const piece = boardState[row][col];
             const captures = [];
             
-            if (piece === 0 || piece >= 100) return captures; // Пустая клетка или шашка другого игрока
+            if (piece === 0) return captures;
             
             const isKing = piece > 2;
             const player = piece === 1 || piece === 3 ? 1 : 2;
@@ -2095,6 +2530,20 @@
             if (move.isCapture) {
                 boardState[move.captureRow][move.captureCol] = 0;
                 
+                // В гладиаторском режиме обновляем статистику
+                if (gladiatorMode) {
+                    totalSurvivors--;
+                    const capturedPiece = gladiatorGrid[currentGridRow][currentGridCol].board[move.captureRow][move.captureCol];
+                    
+                    if (capturedPiece === 1) {
+                        playerSurvivors = 0;
+                        gladiatorGrid[currentGridRow][currentGridCol].playerCount = 0;
+                    } else if (capturedPiece === 2) {
+                        botSurvivors--;
+                        gladiatorGrid[currentGridRow][currentGridCol].botCount--;
+                    }
+                }
+                
                 const newCaptures = getCapturesForChecker(toRow, toCol);
                 const canContinueCapture = newCaptures.length > 0;
                 
@@ -2116,16 +2565,23 @@
                 }
             }
             
-            // ПРЕВРАЩЕНИЕ В ДАМКУ
-            if (piece === 1 && toRow === 0) {
-                boardState[toRow][toCol] = 3;
-                showNotification('👑 Ваша шашка стала дамкой!');
-            } else if (piece === 2 && toRow === 7) {
-                boardState[toRow][toCol] = 4;
+            // ПРЕВРАЩЕНИЕ В ДАМКУ (только не в гладиаторском режиме)
+            if (!gladiatorMode) {
+                if (piece === 1 && toRow === 0) {
+                    boardState[toRow][toCol] = 3;
+                    showNotification('👑 Ваша шашка стала дамкой!');
+                } else if (piece === 2 && toRow === 7) {
+                    boardState[toRow][toCol] = 4;
+                }
             }
             
             // Добавляем ход в историю
             addMoveToHistory(fromRow, fromCol, toRow, toCol, move.isCapture);
+            
+            // В гладиаторском режиме обновляем доску в сетке
+            if (gladiatorMode) {
+                gladiatorGrid[currentGridRow][currentGridCol].board = JSON.parse(JSON.stringify(boardState));
+            }
             
             updateBoardUI();
             clearSelection();
@@ -2135,7 +2591,19 @@
             updateGameStats();
             updatePlayerCards();
             
-            if (currentPlayer === 2 && gameActive && !gladiatorMode) {
+            // В гладиаторском режиме боты ходят после всех ходов игрока
+            if (gladiatorMode) {
+                if (currentPlayer === 2) {
+                    // Сбрасываем таймер
+                    moveTimer = 10;
+                    document.getElementById('move-timer').textContent = moveTimer;
+                    
+                    // Ход ботов
+                    setTimeout(() => {
+                        makeGladiatorBotMoves();
+                    }, 500);
+                }
+            } else if (currentPlayer === 2 && gameActive) {
                 setTimeout(makeBotMove, 500);
             }
             
@@ -2163,15 +2631,10 @@
         }
         
         // ====================================================
-        // УЛУЧШЕННЫЙ ИИ БОТА
+        // ИИ БОТА ДЛЯ ОБЫЧНЫХ РЕЖИМОВ
         // ====================================================
         function makeBotMove() {
             if (!gameActive || currentPlayer !== 2 || botThinking) {
-                return;
-            }
-            
-            // В гладиаторском режиме боты не ходят
-            if (gameMode === 'gladiator') {
                 return;
             }
             
@@ -2261,21 +2724,19 @@
                     score += 15;
                     const capturedPiece = boardState[move.captureData.captureRow][move.captureData.captureCol];
                     if (capturedPiece === 3 || capturedPiece === 4) {
-                        score += 10; // Бонус за взятие дамки
+                        score += 10;
                     }
                 }
                 
-                // Поощряем продвижение вперед
-                if (boardState[move.from.row][move.from.col] === 2) { // Обычная шашка бота
+                if (boardState[move.from.row][move.from.col] === 2) {
                     if (move.to.row > move.from.row) {
-                        score += 5; // Двигаться вперед
+                        score += 5;
                     }
                     if (move.to.row === 7) {
-                        score += 20; // Стать дамкой
+                        score += 20;
                     }
                 }
                 
-                // Поощряем центральные позиции
                 const centerDistance = Math.abs(move.to.col - 3.5) + Math.abs(move.to.row - 3.5);
                 score += (8 - centerDistance) * 0.5;
                 
@@ -2297,13 +2758,11 @@
                         score += 15;
                     }
                     
-                    // Проверяем возможность продолжения взятия
                     const tempBoard = JSON.parse(JSON.stringify(boardState));
                     tempBoard[move.from.row][move.from.col] = 0;
                     tempBoard[move.to.row][move.to.col] = piece;
                     tempBoard[move.captureData.captureRow][move.captureData.captureCol] = 0;
                     
-                    // Временно проверяем продолжение
                     const nextCaptures = getCapturesForChecker(move.to.row, move.to.col);
                     if (nextCaptures.length > 0) {
                         score += 25;
@@ -2314,8 +2773,7 @@
                     score += 30;
                 }
                 
-                if (piece === 4) { // Дамка
-                    // Поощряем позиции в центре для дамки
+                if (piece === 4) {
                     const centerDistance = Math.abs(move.to.col - 3.5) + Math.abs(move.to.row - 3.5);
                     score += (8 - centerDistance) * 2;
                 } else {
@@ -2324,12 +2782,10 @@
                     }
                 }
                 
-                // Избегаем уязвимых позиций
                 if (isVulnerable(move.to.row, move.to.col, 2)) {
                     score -= 15;
                 }
                 
-                // Защита своих шашек
                 if (checkProtection(boardState, move.to.row, move.to.col, 2)) {
                     score += 5;
                 }
@@ -2352,7 +2808,6 @@
                         score += 20;
                     }
                     
-                    // Глубокий анализ продолжения взятия
                     const tempBoard = JSON.parse(JSON.stringify(boardState));
                     tempBoard[move.from.row][move.from.col] = 0;
                     tempBoard[move.to.row][move.to.col] = piece;
@@ -2361,7 +2816,6 @@
                     const nextCaptures = getCapturesForChecker(move.to.row, move.to.col);
                     if (nextCaptures.length > 0) {
                         score += 35;
-                        // Анализируем лучший вариант продолжения
                         let maxCaptureScore = 0;
                         nextCaptures.forEach(capture => {
                             let captureScore = 10;
@@ -2382,11 +2836,9 @@
                 }
                 
                 if (piece === 4) {
-                    // Стратегические позиции для дамки
                     const centerDistance = Math.abs(move.to.col - 3.5) + Math.abs(move.to.row - 3.5);
                     score += (8 - centerDistance) * 3;
                     
-                    // Контроль важных диагоналей
                     if (move.to.row === 3 || move.to.row === 4) {
                         if (move.to.col === 3 || move.to.col === 4) {
                             score += 15;
@@ -2397,20 +2849,16 @@
                         score += 10;
                     }
                     
-                    // Создание "мостов" и защищенных позиций
                     if (checkProtection(boardState, move.to.row, move.to.col, 2)) {
                         score += 8;
                     }
                 }
                 
-                // Избегаем опасных позиций
                 if (isVulnerable(move.to.row, move.to.col, 2)) {
                     score -= 25;
                 }
                 
-                // Блокировка продвижения противника
                 if (gameMode === 'normal' || gameMode === 'rating') {
-                    // Препятствуем продвижению противника к дамочным полям
                     for (let dr = -1; dr <= 1; dr += 2) {
                         for (let dc = -1; dc <= 1; dc += 2) {
                             const checkRow = move.to.row + dr;
@@ -2427,19 +2875,7 @@
                 move.score = score;
             });
             
-            // Запоминаем ходы для обучения
             const bestMove = moves.reduce((best, current) => current.score > best.score ? current : best, moves[0]);
-            botMemory.push({
-                board: JSON.parse(JSON.stringify(boardState)),
-                move: bestMove,
-                score: bestMove.score
-            });
-            
-            // Ограничиваем память
-            if (botMemory.length > 100) {
-                botMemory.shift();
-            }
-            
             return bestMove;
         }
         
@@ -2497,6 +2933,11 @@
         // ДОПОЛНИТЕЛЬНЫЕ ФУНКЦИИ ИГРЫ
         // ====================================================
         function checkGameEnd() {
+            if (gladiatorMode) {
+                checkGladiatorGameEnd();
+                return;
+            }
+            
             let player1HasPieces = false;
             let player2HasPieces = false;
             let player1HasMoves = false;
@@ -2521,25 +2962,23 @@
             }
             
             if (gameMode === 'giveaway') {
-                // В поддавках побеждает тот, кто первым остался без шашек
                 if (!player1HasPieces || !player1HasMoves) {
-                    endGame(1); // Игрок проиграл все шашки - ПОБЕДА в поддавках!
+                    endGame(1);
                 } else if (!player2HasPieces || !player2HasMoves) {
-                    endGame(2); // Бот проиграл все шашки - ПОРАЖЕНИЕ в поддавках!
+                    endGame(2);
                 }
             } else {
                 if (!player1HasPieces || !player1HasMoves) {
-                    endGame(2); // Игрок проиграл
+                    endGame(2);
                 } else if (!player2HasPieces || !player2HasMoves) {
-                    endGame(1); // Игрок победил
+                    endGame(1);
                 }
             }
         }
         
-        function endGame(winner) {
+        function endGame(result) {
             gameActive = false;
             
-            // Останавливаем таймер гладиаторского режима
             if (moveTimerInterval) {
                 clearInterval(moveTimerInterval);
                 moveTimerInterval = null;
@@ -2548,8 +2987,11 @@
             let message = '';
             let gameResult = '';
             
-            if (gameMode === 'giveaway') {
-                if (winner === 1) {
+            if (typeof result === 'string') {
+                // Сообщение из гладиаторского режима
+                message = result;
+            } else if (gameMode === 'giveaway') {
+                if (result === 1) {
                     message = '🎉 Вы отдали все шашки первым! Победа в поддавках!';
                     gameResult = 'win';
                 } else {
@@ -2557,21 +2999,15 @@
                     gameResult = 'loss';
                 }
             } else if (gameMode === 'rating') {
-                if (winner === 1) {
+                if (result === 1) {
                     message = '🎉 Вы победили в рейтинговой игре!';
                     gameResult = 'win';
                 } else {
                     message = '😞 Вы проиграли в рейтинговой игре';
                     gameResult = 'loss';
                 }
-            } else if (gameMode === 'gladiator') {
-                if (winner === 1) {
-                    message = '🎉 Вы победили в гладиаторском режиме!';
-                } else {
-                    message = '😞 Вы проиграли в гладиаторском режиме';
-                }
             } else {
-                if (winner === 1) {
+                if (result === 1) {
                     message = '🎉 Вы победили!';
                     gameResult = 'win';
                 } else {
@@ -2582,12 +3018,10 @@
             
             document.getElementById('game-status').textContent = message;
             
-            // Обновляем статистику пользователя
             if (currentUser && gameMode !== 'gladiator') {
                 updateUserStats(gameResult);
             }
             
-            // Обновляем рейтинг ТОЛЬКО в рейтинговом режиме
             if (currentUser && gameMode === 'rating') {
                 updateRating(gameResult);
             }
@@ -2618,15 +3052,16 @@
             document.getElementById('player1-pieces').textContent = player1Pieces;
             document.getElementById('player2-pieces').textContent = player2Pieces;
             document.getElementById('kings-count').textContent = kingsCount;
+            
+            if (gladiatorMode) {
+                updateGladiatorStats();
+            }
         }
         
         function addMoveToHistory(fromRow, fromCol, toRow, toCol, isCapture) {
             const movesHistory = document.getElementById('moves-history');
             
-            // Определяем, чей ход (currentPlayer уже сменился, поэтому обратно)
             const player = (currentPlayer === 1) ? 'Игрок' : 'Бот'; 
-            
-            // Формула для номера хода
             const moveNumber = Math.ceil((moveCount + 1) / 2);
             
             const fromNotation = `${String.fromCharCode(97 + fromCol)}${8 - fromRow}`;
@@ -2649,37 +3084,25 @@
                 const col = parseInt(cell.dataset.col);
                 const piece = boardState[row][col];
                 
-                // Удаляем старые шашки
+                // Обновляем класс красной зоны
+                let cellClass = `cell ${(row + col) % 2 === 0 ? 'light' : 'dark'}`;
+                if (gladiatorMode && isDangerZone(row, col)) {
+                    cellClass += ' danger-zone';
+                }
+                cell.className = cellClass;
+                
                 const oldChecker = cell.querySelector('.checker');
                 if (oldChecker) {
                     oldChecker.remove();
                 }
                 
-                // Создаем шашку если она есть
                 if (piece !== 0) {
                     const checker = document.createElement('div');
-                    let playerClass = 'player1';
-                    if (piece >= 100) {
-                        // Это другой игрок в гладиаторском режиме
-                        playerClass = PLAYER_COLORS[piece % 100] || 'player3';
-                    } else if (piece === 2 || piece === 4) {
-                        playerClass = 'player2';
-                    }
-                    
-                    checker.className = `checker ${playerClass}${piece > 2 && piece < 100 ? ' king' : ''}`;
+                    // В гладиаторском режиме нет дамок
+                    const isKing = !gladiatorMode && piece > 2;
+                    checker.className = `checker player${piece === 1 || piece === 3 ? '1' : '2'}${isKing ? ' king' : ''}`;
                     checker.dataset.row = row;
                     checker.dataset.col = col;
-                    
-                    // Для мобильных устройств добавляем touch-обработчик
-                    if (isTouchDevice) {
-                        checker.addEventListener('touchstart', function(e) {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            const row = parseInt(this.dataset.row);
-                            const col = parseInt(this.dataset.col);
-                            handleCellClick(row, col);
-                        });
-                    }
                     
                     cell.appendChild(checker);
                 }
@@ -2698,19 +3121,23 @@
                 document.getElementById('game-status').textContent = 'Ваш ход';
             } else {
                 player2Card.classList.add('active');
-                document.getElementById('game-status').textContent = 'Ход бота...';
+                document.getElementById('game-status').textContent = gladiatorMode ? 'Ход ботов...' : 'Ход бота...';
             }
         }
         
         function startNewGame() {
             console.log('🆕 Начало новой игры');
             
+            // Для гладиаторского режима показываем сетку
             if (gladiatorMode) {
-                // В гладиаторском режиме загружаем текущую доску
-                boardState = gladiatorBoards[currentBoardIndex];
-            } else {
-                boardState = getInitialBoard();
+                document.getElementById('gladiator-grid').style.display = 'grid';
+                document.getElementById('board-container').style.display = 'none';
+                gameActive = false;
+                return;
             }
+            
+            // Для обычных режимов
+            boardState = getInitialBoard();
             
             currentPlayer = 1;
             gameActive = true;
@@ -2723,7 +3150,6 @@
             updateGameStats();
             
             document.getElementById('moves-history').innerHTML = '';
-            
             document.getElementById('game-status').textContent = 'Игра началась! Ваш ход';
             
             initBoard();
@@ -2760,13 +3186,15 @@
                 - Цель игры - избавиться от ВСЕХ своих шашек ПЕРВЫМ
                 - Побеждает тот, кто первым остался без шашек
                 
-                Режим "Гладиатор" (онлайн):
-                - 8 игровых полей (сетка 2x4)
-                - Все игроки ходят каждые 10 секунд
-                - Каждый игрок начинает с ОДНОЙ шашки на случайном поле
-                - Можно перемещаться между полями с помощью стрелок
-                - Противники - другие онлайн-игроки
-                - Цель - выживать как можно дольше
+                Режим "Гладиатор" (Королевская битва):
+                - 9 игровых полей (сетка 3x3)
+                - Вы играете против 15 ботов
+                - В каждой ячейке (кроме центральной) спавнится по 2 объекта
+                - Ваша задача - быть последним выжившим
+                - Каждые 2 хода красная зона расширяется от границ к центру
+                - В красную зону нельзя заходить
+                - Шашки могут ходить во всех направлениях (вперед и назад)
+                - Дамок нет
                 
                 Рейтинговая система:
                 - Первые 3 игры - калибровочные
@@ -2797,387 +3225,6 @@
         }
         
         // ====================================================
-        // ГЛАДИАТОРСКИЙ РЕЖИМ
-        // ====================================================
-        function initGladiatorBoards() {
-            gladiatorBoards = [];
-            for (let i = 0; i < 8; i++) {
-                gladiatorBoards.push(getGladiatorBoard());
-            }
-            
-            // Добавляем игрока на случайное поле
-            currentBoardIndex = Math.floor(Math.random() * 8);
-            
-            // Игрок начинает с одной шашки на черной клетке
-            let placed = false;
-            let attempts = 0;
-            
-            while (!placed && attempts < 100) {
-                const row = Math.floor(Math.random() * 8);
-                const col = Math.floor(Math.random() * 8);
-                
-                // Только черные клетки
-                if ((row + col) % 2 === 1 && gladiatorBoards[currentBoardIndex][row][col] === 0) {
-                    gladiatorBoards[currentBoardIndex][row][col] = 1;
-                    placed = true;
-                    console.log(`🎮 Гладиатор: игрок спавнится на поле ${currentBoardIndex + 1}, позиция ${row},${col}`);
-                }
-                attempts++;
-            }
-            
-            if (!placed) {
-                gladiatorBoards[currentBoardIndex][4][3] = 1;
-            }
-        }
-        
-        function getGladiatorBoard() {
-            const board = Array(8).fill().map(() => Array(8).fill(0));
-            return board;
-        }
-        
-        function startGladiatorMode() {
-            console.log('⚔️ Запуск гладиаторского режима');
-            
-            // Останавливаем старый таймер
-            if (moveTimerInterval) {
-                clearInterval(moveTimerInterval);
-            }
-            
-            moveTimer = 10;
-            document.getElementById('move-timer').textContent = moveTimer;
-            
-            // Обновляем отображение поля
-            const row = Math.floor(currentBoardIndex / 4);
-            const col = currentBoardIndex % 4;
-            document.getElementById('current-board').textContent = `${currentBoardIndex + 1} (${row + 1},${col + 1})`;
-            
-            // Запускаем таймер хода
-            moveTimerInterval = setInterval(() => {
-                moveTimer--;
-                document.getElementById('move-timer').textContent = moveTimer;
-                
-                if (moveTimer <= 0) {
-                    // Время хода вышло - перезапускаем таймер
-                    moveTimer = 10;
-                    document.getElementById('move-timer').textContent = moveTimer;
-                    
-                    // Автоматическое перемещение на случайное соседнее поле каждые 10 секунд
-                    if (Math.random() < 0.3) { // 30% шанс на авто-перемещение
-                        const directions = [
-                            { dx: -1, dy: 0 }, // Влево
-                            { dx: 1, dy: 0 },  // Вправо
-                            { dx: 0, dy: -1 }, // Вверх
-                            { dx: 0, dy: 1 }   // Вниз
-                        ];
-                        
-                        const validDirections = directions.filter(dir => {
-                            const newRow = Math.floor(currentBoardIndex / 4) + dir.dy;
-                            const newCol = (currentBoardIndex % 4) + dir.dx;
-                            return newRow >= 0 && newRow < 2 && newCol >= 0 && newCol < 4;
-                        });
-                        
-                        if (validDirections.length > 0) {
-                            const randomDir = validDirections[Math.floor(Math.random() * validDirections.length)];
-                            moveToAdjacentBoard(randomDir.dx, randomDir.dy);
-                        }
-                    }
-                }
-            }, 1000);
-            
-            // Начинаем поиск игры
-            findGladiatorGame();
-        }
-        
-        function moveToAdjacentBoard(dx, dy) {
-            // Вычисляем новую позицию доски (2x4 сетка)
-            let newRow = Math.floor(currentBoardIndex / 4) + dy;
-            let newCol = (currentBoardIndex % 4) + dx;
-            
-            // Проверяем границы
-            if (newRow < 0 || newRow >= 2 || newCol < 0 || newCol >= 4) {
-                showNotification('⚠️ Невозможно переместиться за пределы арены');
-                return;
-            }
-            
-            const newBoardIndex = newRow * 4 + newCol;
-            
-            // Сохраняем текущее состояние доски
-            gladiatorBoards[currentBoardIndex] = JSON.parse(JSON.stringify(boardState));
-            
-            // Переключаемся на новую доску
-            currentBoardIndex = newBoardIndex;
-            
-            // Загружаем новое состояние
-            boardState = JSON.parse(JSON.stringify(gladiatorBoards[currentBoardIndex]));
-            
-            // Обновляем UI
-            const row = Math.floor(currentBoardIndex / 4);
-            const col = currentBoardIndex % 4;
-            document.getElementById('current-board').textContent = `${currentBoardIndex + 1} (${row + 1},${col + 1})`;
-            
-            // Перезапускаем игру
-            gameActive = true;
-            currentPlayer = 1;
-            selectedChecker = null;
-            availableMoves = [];
-            moveCount = 0;
-            
-            updateBoardUI();
-            updateGameStats();
-            updatePlayerCards();
-            document.getElementById('moves-history').innerHTML = '';
-            document.getElementById('game-status').textContent = `Поле ${currentBoardIndex + 1}. Ваш ход!`;
-            
-            // Сбрасываем таймер
-            moveTimer = 10;
-            document.getElementById('move-timer').textContent = moveTimer;
-            
-            showNotification(`Перемещение на поле ${currentBoardIndex + 1} (${row + 1},${col + 1})`);
-            
-            // Обновляем состояние на сервере
-            if (currentGameId && currentUser) {
-                updatePlayerPositionOnServer();
-            }
-        }
-        
-        async function findGladiatorGame() {
-            if (!currentUser) {
-                showNotification('⚠️ Сначала войдите в систему');
-                return;
-            }
-            
-            showNotification('🔍 Поиск гладиаторской игры...', 'info');
-            
-            try {
-                // Ищем активные игры
-                const gamesRef = database.ref('gladiator/games');
-                const snapshot = await gamesRef.orderByChild('playerCount').limitToLast(10).once('value');
-                const games = snapshot.val();
-                
-                let foundGame = null;
-                
-                // Ищем игру с местом (макс 8 игроков на игру)
-                if (games) {
-                    Object.keys(games).forEach(gameId => {
-                        const game = games[gameId];
-                        if (game.playerCount < 8) {
-                            foundGame = { id: gameId, ...game };
-                        }
-                    });
-                }
-                
-                if (foundGame) {
-                    // Присоединяемся к существующей игре
-                    await joinGladiatorGame(foundGame.id);
-                } else {
-                    // Создаем новую игру
-                    await createGladiatorGame();
-                }
-                
-            } catch (error) {
-                console.error('❌ Ошибка поиска игры:', error);
-                showNotification('❌ Ошибка поиска игры', 'error');
-            }
-        }
-        
-        async function createGladiatorGame() {
-            try {
-                const gameRef = database.ref('gladiator/games').push();
-                currentGameId = gameRef.key;
-                
-                const gameData = {
-                    createdAt: firebase.database.ServerValue.TIMESTAMP,
-                    playerCount: 1,
-                    players: {
-                        [currentUser.uid]: {
-                            username: currentUser.username,
-                            boardIndex: currentBoardIndex,
-                            boardState: boardState,
-                            lastMove: firebase.database.ServerValue.TIMESTAMP
-                        }
-                    }
-                };
-                
-                await gameRef.set(gameData);
-                
-                // Начинаем слушать обновления игры
-                setupGladiatorGameListener();
-                
-                showNotification('✅ Новая гладиаторская игра создана!');
-                updateGladiatorPlayersCount(1);
-                
-            } catch (error) {
-                console.error('❌ Ошибка создания игры:', error);
-                showNotification('❌ Ошибка создания игры', 'error');
-            }
-        }
-        
-        async function joinGladiatorGame(gameId) {
-            try {
-                currentGameId = gameId;
-                const gameRef = database.ref(`gladiator/games/${gameId}`);
-                
-                // Добавляем игрока в игру
-                await gameRef.child(`players/${currentUser.uid}`).set({
-                    username: currentUser.username,
-                    boardIndex: currentBoardIndex,
-                    boardState: boardState,
-                    lastMove: firebase.database.ServerValue.TIMESTAMP
-                });
-                
-                // Обновляем счетчик игроков
-                const snapshot = await gameRef.once('value');
-                const gameData = snapshot.val();
-                const playerCount = Object.keys(gameData.players || {}).length;
-                
-                await gameRef.update({ playerCount: playerCount });
-                
-                // Начинаем слушать обновления игры
-                setupGladiatorGameListener();
-                
-                showNotification(`✅ Присоединились к игре! Игроков: ${playerCount}`);
-                updateGladiatorPlayersCount(playerCount);
-                
-            } catch (error) {
-                console.error('❌ Ошибка присоединения к игре:', error);
-                showNotification('❌ Ошибка присоединения к игре', 'error');
-            }
-        }
-        
-        function setupGladiatorGameListener() {
-            if (!currentGameId) return;
-            
-            gladiatorGameRef = database.ref(`gladiator/games/${currentGameId}`);
-            gladiatorGameListener = gladiatorGameRef.on('value', (snapshot) => {
-                const gameData = snapshot.val();
-                if (gameData) {
-                    // Обновляем счетчик игроков
-                    updateGladiatorPlayersCount(gameData.playerCount || 1);
-                    
-                    // Синхронизируем других игроков
-                    syncOtherPlayers(gameData.players);
-                }
-            });
-        }
-        
-        function updateGladiatorPlayersCount(count) {
-            document.getElementById('gladiator-players-count').textContent = count;
-        }
-        
-        function syncOtherPlayers(players) {
-            if (!players || !currentUser) return;
-            
-            // Очищаем старые данные других игроков
-            gladiatorPlayers.clear();
-            
-            // Добавляем других игроков в карту
-            Object.keys(players).forEach((playerId, index) => {
-                if (playerId !== currentUser.uid) {
-                    const player = players[playerId];
-                    player.colorIndex = (index % 6) + 2; // Начинаем с индекса 2 (player3)
-                    gladiatorPlayers.set(playerId, player);
-                    
-                    // Если игрок на том же поле, что и мы, обновляем его шашки
-                    if (player.boardIndex === currentBoardIndex) {
-                        updateOtherPlayerOnBoard(playerId, player);
-                    }
-                }
-            });
-            
-            // Обновляем отображение онлайн игроков
-            updateOnlinePlayersDisplay();
-        }
-        
-        function updateOtherPlayerOnBoard(playerId, playerData) {
-            const playerBoard = playerData.boardState;
-            const colorCode = 100 + playerData.colorIndex; // 102, 103, 104 и т.д.
-            
-            // Обновляем доску с шашками другого игрока
-            for (let row = 0; row < 8; row++) {
-                for (let col = 0; col < 8; col++) {
-                    if (playerBoard[row][col] === 1 || playerBoard[row][col] === 3) {
-                        // Заменяем шашки другого игрока специальным кодом
-                        boardState[row][col] = colorCode + (playerBoard[row][col] === 3 ? 2 : 0);
-                    }
-                }
-            }
-            
-            // Обновляем отображение доски
-            updateBoardUI();
-        }
-        
-        function updateOnlinePlayersDisplay() {
-            const onlineCount = gladiatorPlayers.size;
-            document.getElementById('online-players-count').textContent = onlineCount;
-        }
-        
-        async function updatePlayerPositionOnServer() {
-            if (!currentGameId || !currentUser) return;
-            
-            try {
-                const playerRef = database.ref(`gladiator/games/${currentGameId}/players/${currentUser.uid}`);
-                await playerRef.update({
-                    boardIndex: currentBoardIndex,
-                    boardState: boardState,
-                    lastMove: firebase.database.ServerValue.TIMESTAMP
-                });
-            } catch (error) {
-                console.error('❌ Ошибка обновления позиции:', error);
-            }
-        }
-        
-        async function loadOnlinePlayers() {
-            try {
-                onlinePlayersRef = database.ref('users').orderByChild('status').equalTo('online');
-                onlinePlayersListener = onlinePlayersRef.on('value', (snapshot) => {
-                    const users = snapshot.val();
-                    let onlineCount = 0;
-                    
-                    if (users) {
-                        Object.keys(users).forEach(uid => {
-                            if (uid !== currentUser?.uid) {
-                                onlineCount++;
-                            }
-                        });
-                    }
-                    
-                    // Обновляем отображение
-                    document.getElementById('online-players-count').textContent = onlineCount;
-                });
-            } catch (error) {
-                console.error('❌ Ошибка загрузки онлайн игроков:', error);
-            }
-        }
-        
-        function leaveGladiatorGame() {
-            if (moveTimerInterval) {
-                clearInterval(moveTimerInterval);
-                moveTimerInterval = null;
-            }
-            
-            // Отписываемся от игры
-            if (gladiatorGameListener && gladiatorGameRef) {
-                gladiatorGameRef.off('value', gladiatorGameListener);
-                gladiatorGameListener = null;
-            }
-            
-            // Отписываемся от онлайн игроков
-            if (onlinePlayersListener && onlinePlayersRef) {
-                onlinePlayersRef.off('value', onlinePlayersListener);
-                onlinePlayersListener = null;
-            }
-            
-            // Выходим из игры на сервере
-            if (currentGameId) {
-                leaveGladiatorGameFromServer();
-                currentGameId = null;
-            }
-            
-            // Переключаемся в обычный режим
-            setGameMode('normal');
-        }
-        
-        // ====================================================
         // ЧАТ С КД
         // ====================================================
         async function sendMessage() {
@@ -3199,19 +3246,16 @@
                 return;
             }
             
-            // Проверка КД
             const now = Date.now();
             const timeSinceLastMessage = (now - lastMessageTime) / 1000;
             
             if (timeSinceLastMessage < chatCooldown && lastMessageTime !== 0) {
                 const timeLeft = Math.ceil(chatCooldown - timeSinceLastMessage);
                 
-                // Показываем визуальную индикацию
                 messageInput.placeholder = `Подождите ${timeLeft} секунд...`;
                 messageInput.style.borderColor = '#ffcc00';
                 messageInput.style.boxShadow = '0 0 0 3px rgba(255, 204, 0, 0.2)';
                 
-                // Обновляем таймер в сообщении
                 const cooldownMsg = document.getElementById('chat-cooldown');
                 const cooldownTimer = document.getElementById('cooldown-timer');
                 if (cooldownMsg && cooldownTimer) {
@@ -3219,12 +3263,10 @@
                     cooldownTimer.textContent = timeLeft;
                 }
                 
-                // Визуальная анимация для кнопки
                 const sendBtn = document.querySelector('#message-input button');
                 sendBtn.style.background = 'linear-gradient(90deg, #666, #888)';
                 sendBtn.style.cursor = 'not-allowed';
                 
-                // Таймер для обновления плейсхолдера
                 const interval = setInterval(() => {
                     const currentTimeLeft = Math.ceil(chatCooldown - ((Date.now() - lastMessageTime) / 1000));
                     if (currentTimeLeft > 0) {
@@ -3260,7 +3302,6 @@
                 messageInput.style.boxShadow = 'none';
                 lastMessageTime = now;
                 
-                // Сбрасываем таймер КД в UI
                 document.getElementById('chat-cooldown').style.display = 'none';
                 
             } catch (error) {
@@ -3305,7 +3346,7 @@
         }
         
         // ====================================================
-        // РЕЙТИНГОВАЯ СИСТЕМА
+        // РЕЙТИНГОВАЯ СИСТЕМА (ТОЛЬКО ДЛЯ АДМИНА)
         // ====================================================
         async function updateRating(gameResult) {
             if (!currentUser) return;
@@ -3331,7 +3372,6 @@
                 if (!userCalibrationCompleted && userCalibrationGames < 3) {
                     userCalibrationGames++;
                     
-                    // КАЛИБРОВКА: определяем начальный рейтинг
                     if (result === 1) {
                         ratingChange = 1000;
                         newRating = 2500 + (Math.random() * 1000);
@@ -3410,43 +3450,7 @@
             return 8;
         }
         
-        async function resetRating() {
-            if (!currentUser) return;
-            
-            try {
-                const userRef = database.ref('users/' + currentUser.uid);
-                const snapshot = await userRef.once('value');
-                const userData = snapshot.val() || {};
-                
-                const now = new Date();
-                const oneMonthAgo = new Date(now.getFullYear(), now.getMonth() - 1, now.getDate());
-                
-                if (userData.lastRatingReset && new Date(userData.lastRatingReset) > oneMonthAgo) {
-                    const daysLeft = Math.ceil((new Date(userData.lastRatingReset) - oneMonthAgo) / (1000 * 60 * 60 * 24));
-                    showNotification(`⏳ Сброс рейтинга будет доступен через ${daysLeft} дней`, 'warning');
-                    return;
-                }
-                
-                if (confirm('Вы уверены, что хотите сбросить свой рейтинг? Все калибровочные игры будут сброшены.')) {
-                    await userRef.update({
-                        rating: 0,
-                        calibrationGames: 0,
-                        calibrationCompleted: false,
-                        lastRatingReset: firebase.database.ServerValue.TIMESTAMP
-                    });
-                    
-                    currentUser.rating = 0;
-                    currentUser.calibrationGames = 0;
-                    currentUser.calibrationCompleted = false;
-                    
-                    updateUserUI();
-                    showNotification('✅ Ваш рейтинг сброшен');
-                }
-            } catch (error) {
-                console.error('❌ Ошибка сброса рейтинга:', error);
-                showNotification('❌ Ошибка сброса рейтинга', 'error');
-            }
-        }
+        // Убрали функцию resetRating для обычных пользователей
         
         function updateCalibrationInfo() {
             if (!currentUser) return;
@@ -3475,16 +3479,6 @@
             if (chatListener) {
                 chatRef.off('value', chatListener);
                 chatListener = null;
-            }
-            
-            if (gladiatorGameListener && gladiatorGameRef) {
-                gladiatorGameRef.off('value', gladiatorGameListener);
-                gladiatorGameListener = null;
-            }
-            
-            if (onlinePlayersListener && onlinePlayersRef) {
-                onlinePlayersRef.off('value', onlinePlayersListener);
-                onlinePlayersListener = null;
             }
             
             if (moveTimerInterval) {
@@ -3517,11 +3511,6 @@
                 document.getElementById('adminBadge').style.display = 'inline-block';
             }
             
-            if (currentUser && !currentUser.isAdmin) {
-                document.getElementById('personalResetBtn').style.display = 'inline-block';
-            }
-            
-            // Включаем чат
             document.getElementById('message').disabled = false;
             document.querySelector('#message-input button').disabled = false;
             
