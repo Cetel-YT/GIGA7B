@@ -301,18 +301,20 @@
         
         #board {
             display: grid;
-            grid-template-columns: repeat(8, 70px);
-            grid-template-rows: repeat(8, 70px);
+            grid-template-columns: repeat(32, 20px);
+            grid-template-rows: repeat(32, 20px);
             margin: 0 auto;
             border: 4px solid #444;
             border-radius: 5px;
             overflow: hidden;
             box-shadow: 0 0 30px rgba(0, 0, 0, 0.8);
+            width: max-content;
+            height: max-content;
         }
         
         .cell {
-            width: 70px;
-            height: 70px;
+            width: 20px;
+            height: 20px;
             display: flex;
             justify-content: center;
             align-items: center;
@@ -358,30 +360,30 @@
         }
         
         .cell.selected {
-            box-shadow: inset 0 0 0 4px #00ff88;
+            box-shadow: inset 0 0 0 3px #00ff88;
         }
         
         .cell.available {
-            box-shadow: inset 0 0 0 3px rgba(255, 204, 0, 0.8);
+            box-shadow: inset 0 0 0 2px rgba(255, 204, 0, 0.8);
         }
         
         .cell.available.capture {
-            box-shadow: inset 0 0 0 3px rgba(255, 50, 50, 0.8);
+            box-shadow: inset 0 0 0 2px rgba(255, 50, 50, 0.8);
         }
         
         .cell.available::after {
             content: '';
             position: absolute;
-            width: 20px;
-            height: 20px;
+            width: 8px;
+            height: 8px;
             border-radius: 50%;
             background: rgba(255, 204, 0, 0.6);
         }
         
         .cell.available.capture::after {
             background: rgba(255, 50, 50, 0.8);
-            width: 25px;
-            height: 25px;
+            width: 10px;
+            height: 10px;
         }
         
         .cell.must-capture {
@@ -395,19 +397,19 @@
         }
         
         .checker {
-            width: 60px;
-            height: 60px;
+            width: 18px;
+            height: 18px;
             border-radius: 50%;
             cursor: pointer;
             position: relative;
             z-index: 10;
             transition: all 0.2s ease;
-            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.4);
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.4);
         }
         
         .checker:hover {
-            transform: scale(1.1);
-            box-shadow: 0 6px 15px rgba(0, 0, 0, 0.6);
+            transform: scale(1.3);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.6);
         }
         
         .checker.player1 {
@@ -423,7 +425,7 @@
         }
         
         .checker.king {
-            box-shadow: 0 0 0 4px #ffcc00, 0 4px 10px rgba(0, 0, 0, 0.4);
+            box-shadow: 0 0 0 2px #ffcc00, 0 2px 5px rgba(0, 0, 0, 0.4);
         }
         
         .checker.king::after {
@@ -433,9 +435,9 @@
             left: 50%;
             transform: translate(-50%, -50%);
             color: #ffcc00;
-            font-size: 28px;
+            font-size: 10px;
             font-weight: bold;
-            text-shadow: 1px 1px 3px rgba(0, 0, 0, 0.8);
+            text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.8);
         }
         
         #game-controls {
@@ -783,39 +785,43 @@
             }
             
             #board {
-                grid-template-columns: repeat(8, 60px);
-                grid-template-rows: repeat(8, 60px);
+                grid-template-columns: repeat(32, 15px);
+                grid-template-rows: repeat(32, 15px);
             }
             
             .cell, .checker {
-                width: 60px;
-                height: 60px;
+                width: 15px;
+                height: 15px;
             }
             
             .checker {
-                width: 50px;
-                height: 50px;
+                width: 13px;
+                height: 13px;
+            }
+            
+            .checker.king::after {
+                font-size: 8px;
             }
         }
         
         @media (max-width: 768px) {
             #board {
-                grid-template-columns: repeat(8, 50px);
-                grid-template-rows: repeat(8, 50px);
+                grid-template-columns: repeat(32, 12px);
+                grid-template-rows: repeat(32, 12px);
             }
             
             .cell, .checker {
-                width: 50px;
-                height: 50px;
+                width: 12px;
+                height: 12px;
             }
             
             .checker {
-                width: 40px;
-                height: 40px;
+                width: 10px;
+                height: 10px;
             }
             
             .checker.king::after {
-                font-size: 20px;
+                font-size: 6px;
             }
             
             #player-info {
@@ -865,7 +871,7 @@
     
     <div class="container">
         <header>
-            <h1>🎮 Онлайн шашки</h1>
+            <h1>🎮 Онлайн шашки 32x32</h1>
             <p class="subtitle">Играйте с ботом по правилам русских шашек</p>
         </header>
         
@@ -951,14 +957,14 @@
                 
                 <!-- ИНФОРМАЦИЯ О ГЛАДИАТОРСКОМ РЕЖИМЕ -->
                 <div id="gladiator-info">
-                    <h3>⚔️ Гладиаторский режим</h3>
+                    <h3>⚔️ Гладиаторский режим 32x32</h3>
                     <div id="warning-zone-info" class="warning-zone-info" style="display: none;">
                         <div>⚠️ <strong>ВНИМАНИЕ!</strong> Следующим ходом расширится красная зона!</div>
                     </div>
                     <div id="danger-zone-info" class="danger-zone-info">
-                        <div>🔥 Красная зона расширится через: <span id="danger-zone-timer">2</span> хода</div>
+                        <div>🔥 Красная зона расширится через: <span id="danger-zone-timer">3</span> хода</div>
                         <div class="danger-zone-level">Уровень красной зоны: <span id="danger-zone-level">0</span></div>
-                        <div>Осталось объектов: <span id="survivors-count">7</span>/7</div>
+                        <div>Осталось объектов: <span id="survivors-count">24</span>/24</div>
                     </div>
                 </div>
                 
@@ -1028,7 +1034,7 @@
                                 <div class="stat-label">Выживших игроков</div>
                             </div>
                             <div class="stat-item">
-                                <div class="stat-value-large" id="gladiator-bot-count">6</div>
+                                <div class="stat-value-large" id="gladiator-bot-count">23</div>
                                 <div class="stat-label">Выживших ботов</div>
                             </div>
                             <div class="stat-item">
@@ -1098,20 +1104,23 @@
         let lastMessageTime = 0;
         let chatCooldown = 10;
         
+        // Размер доски
+        const BOARD_SIZE = 32;
+        
         // Режимы игры
         let gameMode = 'normal';
         let gladiatorMode = false;
         
         // Гладиаторский режим
         let dangerZoneLevel = 0;
-        let dangerZoneTimer = 2;
+        let dangerZoneTimer = 3; // Больше ходов для большой доски
         let gladiatorRound = 1;
         let gladiatorTurn = 1;
         let playerAlive = true;
-        let botsAlive = 6;
+        let botsAlive = 23; // 23 бота + игрок = 24 всего
         let gladiatorBoard = [];
         let isPlayerTurn = true;
-        let hasContinuingCapture = false; // Флаг для продолжения взятия
+        let hasContinuingCapture = false;
         
         // Администраторы
         const ADMIN_USERS = ['admin', 'administrator', 'супервайзер'];
@@ -1460,9 +1469,9 @@
                 document.getElementById('gladiator-info').style.display = 'block';
                 document.getElementById('gladiator-stats').style.display = 'block';
                 
-                document.getElementById('player2-name').textContent = '6 ботов';
+                document.getElementById('player2-name').textContent = '23 бота';
                 document.getElementById('player2-rating').textContent = 'Королевская битва';
-                showNotification('⚔️ Гладиаторский режим! Битва до последнего выжившего');
+                showNotification('⚔️ Гладиаторский режим 32x32! Битва до последнего выжившего');
             } else {
                 document.getElementById('bot-controls').style.display = 'block';
                 document.getElementById('gladiator-controls').style.display = 'none';
@@ -1487,109 +1496,104 @@
         }
         
         // ====================================================
-        // ГЛАДИАТОРСКИЙ РЕЖИМ - ИСПРАВЛЕННЫЙ КОД
+        // ГЛАДИАТОРСКИЙ РЕЖИМ 32x32
         // ====================================================
         function initGladiatorBoard() {
-            gladiatorBoard = Array(8).fill().map(() => Array(8).fill(0));
+            gladiatorBoard = Array(BOARD_SIZE).fill().map(() => Array(BOARD_SIZE).fill(0));
             
-            // Получаем все черные клетки на границах доски (ряды 0 и 7, колонки 0 и 7)
+            // Получаем все черные клетки на границах доски (ряды 0 и 31, колонки 0 и 31)
             const borderCells = [];
             
             // Верхняя граница (ряд 0)
-            for (let col = 0; col < 8; col++) {
+            for (let col = 0; col < BOARD_SIZE; col++) {
                 if ((0 + col) % 2 === 1) { // Черная клетка
                     borderCells.push({row: 0, col: col});
                 }
             }
             
-            // Нижняя граница (ряд 7)
-            for (let col = 0; col < 8; col++) {
-                if ((7 + col) % 2 === 1) { // Черная клетка
-                    borderCells.push({row: 7, col: col});
+            // Нижняя граница (ряд 31)
+            for (let col = 0; col < BOARD_SIZE; col++) {
+                if (((BOARD_SIZE-1) + col) % 2 === 1) { // Черная клетка
+                    borderCells.push({row: BOARD_SIZE-1, col: col});
                 }
             }
             
-            // Левая граница (колонка 0) - пропускаем углы (0,0) и (7,0)
-            for (let row = 1; row < 7; row++) {
+            // Левая граница (колонка 0) - пропускаем углы
+            for (let row = 1; row < BOARD_SIZE-1; row++) {
                 if ((row + 0) % 2 === 1) { // Черная клетка
                     borderCells.push({row: row, col: 0});
                 }
             }
             
-            // Правая граница (колонка 7) - пропускаем углы (0,7) и (7,7)
-            for (let row = 1; row < 7; row++) {
-                if ((row + 7) % 2 === 1) { // Черная клетка
-                    borderCells.push({row: row, col: 7});
+            // Правая граница (колонка 31) - пропускаем углы
+            for (let row = 1; row < BOARD_SIZE-1; row++) {
+                if ((row + (BOARD_SIZE-1)) % 2 === 1) { // Черная клетка
+                    borderCells.push({row: row, col: BOARD_SIZE-1});
                 }
             }
             
             // Перемешиваем клетки
             const shuffledCells = [...borderCells].sort(() => Math.random() - 0.5);
             
-            // Размещаем игрока
-            const playerPos = shuffledCells[0];
-            gladiatorBoard[playerPos.row][playerPos.col] = 1;
-            
-            // Размещаем ботов с расстоянием минимум 3 клетки (2 белых + черная между ними)
+            // Размещаем игрока с расстоянием от других шашек
+            let placedPlayer = false;
             let placedBots = 0;
+            const placedPositions = [];
             
-            for (let i = 1; i < shuffledCells.length && placedBots < 6; i++) {
+            // Сначала попробуем найти хорошую позицию для игрока
+            for (let i = 0; i < shuffledCells.length && !placedPlayer; i++) {
                 const pos = shuffledCells[i];
                 let canPlace = true;
                 
-                // Проверяем расстояние до всех уже размещенных шашек
-                for (let row = 0; row < 8; row++) {
-                    for (let col = 0; col < 8; col++) {
-                        if (gladiatorBoard[row][col] !== 0) {
-                            // Рассчитываем манхэттенское расстояние
-                            const manhattanDistance = Math.abs(row - pos.row) + Math.abs(col - pos.col);
-                            
-                            // Нужно минимум 3 клетки расстояния (включая 2 белые и черную между)
-                            // Для черных клеток по диагонали: расстояние 2 клетки = 1 черная между
-                            // Нужно расстояние 4 клетки, чтобы было 2 белые + черная между
-                            if (manhattanDistance < 4) {
-                                canPlace = false;
-                                break;
-                            }
-                            
-                            // Дополнительная проверка: между ними должно быть минимум 2 белые клетки
-                            let whiteCellsBetween = 0;
-                            const minRow = Math.min(row, pos.row);
-                            const maxRow = Math.max(row, pos.row);
-                            const minCol = Math.min(col, pos.col);
-                            const maxCol = Math.max(col, pos.col);
-                            
-                            for (let r = minRow; r <= maxRow; r++) {
-                                for (let c = minCol; c <= maxCol; c++) {
-                                    // Пропускаем сами шашки
-                                    if ((r === row && c === col) || (r === pos.row && c === pos.col)) {
-                                        continue;
-                                    }
-                                    // Считаем белые клетки
-                                    if ((r + c) % 2 === 0) {
-                                        whiteCellsBetween++;
-                                    }
-                                }
-                            }
-                            
-                            if (whiteCellsBetween < 2) {
-                                canPlace = false;
-                                break;
-                            }
-                        }
+                // Проверяем расстояние до уже размещенных шашек
+                for (const placedPos of placedPositions) {
+                    const rowDist = Math.abs(placedPos.row - pos.row);
+                    const colDist = Math.abs(placedPos.col - pos.col);
+                    
+                    // Минимум 5 клеток расстояния (2 черные клетки между ними)
+                    if (rowDist + colDist < 5) {
+                        canPlace = false;
+                        break;
                     }
-                    if (!canPlace) break;
+                }
+                
+                if (canPlace) {
+                    gladiatorBoard[pos.row][pos.col] = 1;
+                    placedPositions.push(pos);
+                    placedPlayer = true;
+                    break;
+                }
+            }
+            
+            // Размещаем ботов с расстоянием минимум 5 клеток (2 черные клетки между ними)
+            for (let i = 0; i < shuffledCells.length && placedBots < 23; i++) {
+                const pos = shuffledCells[i];
+                if (gladiatorBoard[pos.row][pos.col] !== 0) continue;
+                
+                let canPlace = true;
+                
+                // Проверяем расстояние до всех уже размещенных шашек
+                for (const placedPos of placedPositions) {
+                    const rowDist = Math.abs(placedPos.row - pos.row);
+                    const colDist = Math.abs(placedPos.col - pos.col);
+                    
+                    // Минимум 5 клеток расстояния
+                    if (rowDist + colDist < 5) {
+                        canPlace = false;
+                        break;
+                    }
                 }
                 
                 if (canPlace) {
                     gladiatorBoard[pos.row][pos.col] = 2;
+                    placedPositions.push(pos);
                     placedBots++;
                 }
             }
             
             // Если не удалось разместить всех ботов с расстоянием, размещаем оставшихся
-            if (placedBots < 6) {
-                for (let i = 1; i < shuffledCells.length && placedBots < 6; i++) {
+            if (placedBots < 23) {
+                for (let i = 0; i < shuffledCells.length && placedBots < 23; i++) {
                     const pos = shuffledCells[i];
                     if (gladiatorBoard[pos.row][pos.col] === 0) {
                         gladiatorBoard[pos.row][pos.col] = 2;
@@ -1599,11 +1603,11 @@
             }
             
             dangerZoneLevel = 0;
-            dangerZoneTimer = 2;
+            dangerZoneTimer = 3;
             gladiatorRound = 1;
             gladiatorTurn = 1;
             playerAlive = true;
-            botsAlive = 6;
+            botsAlive = 23;
             isPlayerTurn = true;
             hasContinuingCapture = false;
             
@@ -1612,7 +1616,7 @@
             updateBoardUI();
             updateDangerZoneDisplay();
             
-            showNotification('⚔️ Гладиаторская доска создана! 1 игрок против 6 ботов по краям доски');
+            showNotification('⚔️ Гладиаторская доска 32x32 создана! 1 игрок против 23 ботов');
         }
         
         function updateGladiatorUI() {
@@ -1646,8 +1650,8 @@
                 cell.classList.remove('danger-zone', 'warning-zone');
                 
                 if (dangerZoneLevel > 0) {
-                    if (row < dangerZoneLevel || row >= 8 - dangerZoneLevel || 
-                        col < dangerZoneLevel || col >= 8 - dangerZoneLevel) {
+                    if (row < dangerZoneLevel || row >= BOARD_SIZE - dangerZoneLevel || 
+                        col < dangerZoneLevel || col >= BOARD_SIZE - dangerZoneLevel) {
                         cell.classList.add('danger-zone');
                     }
                 }
@@ -1655,8 +1659,8 @@
                 // Показываем желтую зону за 1 ход до расширения
                 if (dangerZoneTimer === 1) {
                     const warningLevel = dangerZoneLevel + 1;
-                    if (row < warningLevel || row >= 8 - warningLevel || 
-                        col < warningLevel || col >= 8 - warningLevel) {
+                    if (row < warningLevel || row >= BOARD_SIZE - warningLevel || 
+                        col < warningLevel || col >= BOARD_SIZE - warningLevel) {
                         // Не накладываем желтую зону на уже красную
                         if (!cell.classList.contains('danger-zone')) {
                             cell.classList.add('warning-zone');
@@ -1668,18 +1672,18 @@
         
         function expandDangerZone() {
             dangerZoneLevel++;
-            dangerZoneTimer = 2;
+            dangerZoneTimer = 3;
             
             let removedPlayer = false;
             let removedBots = 0;
             
             // УДАЛЯЕМ ВСЕ ШАШКИ В КРАСНОЙ ЗОНЕ
-            for (let row = 0; row < 8; row++) {
-                for (let col = 0; col < 8; col++) {
+            for (let row = 0; row < BOARD_SIZE; row++) {
+                for (let col = 0; col < BOARD_SIZE; col++) {
                     if (gladiatorBoard[row][col] !== 0) {
                         // Проверяем, находится ли клетка в красной зоне
-                        if (row < dangerZoneLevel || row >= 8 - dangerZoneLevel || 
-                            col < dangerZoneLevel || col >= 8 - dangerZoneLevel) {
+                        if (row < dangerZoneLevel || row >= BOARD_SIZE - dangerZoneLevel || 
+                            col < dangerZoneLevel || col >= BOARD_SIZE - dangerZoneLevel) {
                             
                             if (gladiatorBoard[row][col] === 1) {
                                 removedPlayer = true;
@@ -1725,8 +1729,11 @@
                 { dr: 1, dc: 1 }
             ];
             
-            const enemy = (player === 1) ? 2 : 1;
             let hasCaptures = false;
+            
+            // В гладиаторском режиме боты могут бить других ботов
+            // Враг для бота (2) - это 1 (игрок) и 2 (другие боты)
+            // Враг для игрока (1) - это 2 (боты)
             
             // Проверяем возможность взятия
             for (const dir of directions) {
@@ -1737,19 +1744,35 @@
                 
                 if (isValidPosition(captureRow, captureCol) && 
                     isValidPosition(jumpRow, jumpCol) &&
-                    gladiatorBoard[captureRow][captureCol] === enemy &&
+                    gladiatorBoard[captureRow][captureCol] !== 0 &&
                     gladiatorBoard[jumpRow][jumpCol] === 0) {
                     
-                    // Разрешаем взятие даже в желтую/красную зону
-                    moves.push({
-                        row: jumpRow,
-                        col: jumpCol,
-                        isCapture: true,
-                        captureRow: captureRow,
-                        captureCol: captureCol,
-                        direction: dir
-                    });
-                    hasCaptures = true;
+                    // Проверяем, что это не своя шашка (для игрока)
+                    if (player === 1) {
+                        // Игрок может бить только ботов (2)
+                        if (gladiatorBoard[captureRow][captureCol] === 2) {
+                            moves.push({
+                                row: jumpRow,
+                                col: jumpCol,
+                                isCapture: true,
+                                captureRow: captureRow,
+                                captureCol: captureCol,
+                                direction: dir
+                            });
+                            hasCaptures = true;
+                        }
+                    } else if (player === 2) {
+                        // Бот может бить и игрока (1), и других ботов (2)
+                        moves.push({
+                            row: jumpRow,
+                            col: jumpCol,
+                            isCapture: true,
+                            captureRow: captureRow,
+                            captureCol: captureCol,
+                            direction: dir
+                        });
+                        hasCaptures = true;
+                    }
                 }
             }
             
@@ -1781,21 +1804,21 @@
         
         function isInDangerZone(row, col) {
             return dangerZoneLevel > 0 && 
-                   (row < dangerZoneLevel || row >= 8 - dangerZoneLevel || 
-                    col < dangerZoneLevel || col >= 8 - dangerZoneLevel);
+                   (row < dangerZoneLevel || row >= BOARD_SIZE - dangerZoneLevel || 
+                    col < dangerZoneLevel || col >= BOARD_SIZE - dangerZoneLevel);
         }
         
         function isInWarningZone(row, col) {
             return dangerZoneTimer === 1 && 
-                   (row < dangerZoneLevel + 1 || row >= 7 - dangerZoneLevel || 
-                    col < dangerZoneLevel + 1 || col >= 7 - dangerZoneLevel);
+                   (row < dangerZoneLevel + 1 || row >= BOARD_SIZE - 1 - dangerZoneLevel || 
+                    col < dangerZoneLevel + 1 || col >= BOARD_SIZE - 1 - dangerZoneLevel);
         }
         
         function canPlayerMakeAnyMove() {
             if (!playerAlive) return false;
             
-            for (let row = 0; row < 8; row++) {
-                for (let col = 0; col < 8; col++) {
+            for (let row = 0; row < BOARD_SIZE; row++) {
+                for (let col = 0; col < BOARD_SIZE; col++) {
                     if (gladiatorBoard[row][col] === 1) {
                         const moves = getGladiatorAvailableMoves(row, col, 1);
                         if (moves.length > 0) {
@@ -1899,8 +1922,8 @@
             }
             
             const bots = [];
-            for (let row = 0; row < 8; row++) {
-                for (let col = 0; col < 8; col++) {
+            for (let row = 0; row < BOARD_SIZE; row++) {
+                for (let col = 0; col < BOARD_SIZE; col++) {
                     if (gladiatorBoard[row][col] === 2) {
                         bots.push({ row, col });
                     }
@@ -1973,7 +1996,7 @@
                 }
                 
                 botIndex++;
-                setTimeout(makeNextBotMove, 300);
+                setTimeout(makeNextBotMove, 100);
             }
             
             makeNextBotMove();
@@ -1991,9 +2014,15 @@
                 if (move.isCapture) {
                     score += 100;
                     
+                    // Предпочитаем бить игрока
                     if (gladiatorBoard[move.captureRow] && 
                         gladiatorBoard[move.captureRow][move.captureCol] === 1) {
                         score += 200;
+                    }
+                    // Если бьем другого бота - тоже хорошо, но меньше очков
+                    else if (gladiatorBoard[move.captureRow] && 
+                             gladiatorBoard[move.captureRow][move.captureCol] === 2) {
+                        score += 50;
                     }
                 }
                 
@@ -2004,14 +2033,17 @@
                     }
                 }
                 
-                const distanceToCenter = Math.abs(move.row - 3.5) + Math.abs(move.col - 3.5);
-                score += (14 - distanceToCenter) * 2;
+                // Двигаемся к центру
+                const center = (BOARD_SIZE - 1) / 2;
+                const distanceToCenter = Math.abs(move.row - center) + Math.abs(move.col - center);
+                score += (BOARD_SIZE * 2 - distanceToCenter) * 2;
                 
+                // Держимся подальше от опасной зоны
                 const distanceToDanger = Math.min(
                     move.row,
-                    7 - move.row,
+                    BOARD_SIZE - 1 - move.row,
                     move.col,
-                    7 - move.col
+                    BOARD_SIZE - 1 - move.col
                 );
                 score += distanceToDanger * 5;
                 
@@ -2061,13 +2093,13 @@
         }
         
         function startGladiatorRound() {
-            console.log('⚔️ Начало гладиаторского раунда');
+            console.log('⚔️ Начало гладиаторского раунда 32x32');
             initGladiatorBoard();
             gameActive = true;
             isPlayerTurn = true;
             hasContinuingCapture = false;
             updatePlayerCards();
-            showNotification('⚔️ Гладиаторская битва началась! Ваш ход.');
+            showNotification('⚔️ Гладиаторская битва 32x32 началась! Ваш ход.');
         }
         
         function endGladiatorGame(message = '') {
@@ -2091,8 +2123,8 @@
                 boardState = getInitialBoard();
             }
             
-            for (let row = 0; row < 8; row++) {
-                for (let col = 0; col < 8; col++) {
+            for (let row = 0; row < BOARD_SIZE; row++) {
+                for (let col = 0; col < BOARD_SIZE; col++) {
                     const cell = document.createElement('div');
                     
                     let cellClass = `cell ${(row + col) % 2 === 0 ? 'light' : 'dark'}`;
@@ -2138,11 +2170,12 @@
         }
         
         function getInitialBoard() {
-            const board = Array(8).fill().map(() => Array(8).fill(0));
+            const board = Array(BOARD_SIZE).fill().map(() => Array(BOARD_SIZE).fill(0));
             
             // Игрок (нижняя часть) - только на черных клетках
-            for (let row = 5; row < 8; row++) {
-                for (let col = 0; col < 8; col++) {
+            const playerRows = Math.floor(BOARD_SIZE / 4) * 3;
+            for (let row = playerRows; row < BOARD_SIZE; row++) {
+                for (let col = 0; col < BOARD_SIZE; col++) {
                     if ((row + col) % 2 === 1) { // Только черные клетки
                         board[row][col] = 1;
                     }
@@ -2150,8 +2183,9 @@
             }
             
             // Бот (верхняя часть) - только на черных клетках
-            for (let row = 0; row < 3; row++) {
-                for (let col = 0; col < 8; col++) {
+            const botRows = Math.floor(BOARD_SIZE / 4);
+            for (let row = 0; row < botRows; row++) {
+                for (let col = 0; col < BOARD_SIZE; col++) {
                     if ((row + col) % 2 === 1) { // Только черные клетки
                         board[row][col] = 2;
                     }
@@ -2199,8 +2233,8 @@
             if (piece === 1) {
                 const allCaptures = [];
                 
-                for (let r = 0; r < 8; r++) {
-                    for (let c = 0; c < 8; c++) {
+                for (let r = 0; r < BOARD_SIZE; r++) {
+                    for (let c = 0; c < BOARD_SIZE; c++) {
                         if (gladiatorBoard[r][c] === 1) {
                             const captures = getGladiatorAvailableMoves(r, c, 1).filter(m => m.isCapture);
                             if (captures.length > 0) {
@@ -2352,8 +2386,8 @@
         function getAllCapturesForPlayer(player) {
             const captures = [];
             
-            for (let row = 0; row < 8; row++) {
-                for (let col = 0; col < 8; col++) {
+            for (let row = 0; row < BOARD_SIZE; row++) {
+                for (let col = 0; col < BOARD_SIZE; col++) {
                     const piece = boardState[row][col];
                     if ((player === 1 && (piece === 1 || piece === 3)) || 
                         (player === 2 && (piece === 2 || piece === 4))) {
@@ -2464,7 +2498,7 @@
         }
         
         function isValidPosition(row, col) {
-            return row >= 0 && row < 8 && col >= 0 && col < 8;
+            return row >= 0 && row < BOARD_SIZE && col >= 0 && col < BOARD_SIZE;
         }
         
         function makeMove(toRow, toCol) {
@@ -2498,7 +2532,7 @@
             if (piece === 1 && toRow === 0) {
                 boardState[toRow][toCol] = 3;
                 showNotification('👑 Ваша шашка стала дамкой!');
-            } else if (piece === 2 && toRow === 7) {
+            } else if (piece === 2 && toRow === BOARD_SIZE - 1) {
                 boardState[toRow][toCol] = 4;
             }
             
@@ -2580,8 +2614,8 @@
             let player2Pieces = 0;
             let kingsCount = 0;
             
-            for (let row = 0; row < 8; row++) {
-                for (let col = 0; col < 8; col++) {
+            for (let row = 0; row < BOARD_SIZE; row++) {
+                for (let col = 0; col < BOARD_SIZE; col++) {
                     const piece = boardState[row][col];
                     if (piece === 1 || piece === 3) {
                         player1Pieces++;
@@ -2604,8 +2638,8 @@
             const movesHistory = document.getElementById('moves-history');
             const player = (currentPlayer === 1) ? 'Игрок' : 'Бот'; 
             const moveNumber = Math.ceil((moveCount + 1) / 2);
-            const fromNotation = `${String.fromCharCode(97 + fromCol)}${8 - fromRow}`;
-            const toNotation = `${String.fromCharCode(97 + toCol)}${8 - toRow}`;
+            const fromNotation = `${String.fromCharCode(97 + fromCol)}${BOARD_SIZE - fromRow}`;
+            const toNotation = `${String.fromCharCode(97 + toCol)}${BOARD_SIZE - toRow}`;
             
             const moveElement = document.createElement('div');
             moveElement.className = 'move-item';
@@ -2694,8 +2728,8 @@
                     });
                 });
             } else {
-                for (let row = 0; row < 8; row++) {
-                    for (let col = 0; col < 8; col++) {
+                for (let row = 0; row < BOARD_SIZE; row++) {
+                    for (let col = 0; col < BOARD_SIZE; col++) {
                         if (boardState[row][col] === 2 || boardState[row][col] === 4) {
                             const moves = getAvailableMoves(row, col);
                             moves.forEach(move => {
@@ -2754,11 +2788,11 @@
                 
                 if (boardState[move.from.row][move.from.col] === 2) {
                     if (move.to.row > move.from.row) score += 5;
-                    if (move.to.row === 7) score += 20;
+                    if (move.to.row === BOARD_SIZE - 1) score += 20;
                 }
                 
-                const centerDistance = Math.abs(move.to.col - 3.5) + Math.abs(move.to.row - 3.5);
-                score += (8 - centerDistance) * 0.5;
+                const centerDistance = Math.abs(move.to.col - (BOARD_SIZE-1)/2) + Math.abs(move.to.row - (BOARD_SIZE-1)/2);
+                score += (BOARD_SIZE - centerDistance) * 0.5;
                 move.score = score;
             });
             
@@ -2784,10 +2818,10 @@
                     if (nextCaptures.length > 0) score += 25;
                 }
                 
-                if (piece === 2 && move.to.row === 7) score += 30;
+                if (piece === 2 && move.to.row === BOARD_SIZE - 1) score += 30;
                 if (piece === 4) {
-                    const centerDistance = Math.abs(move.to.col - 3.5) + Math.abs(move.to.row - 3.5);
-                    score += (8 - centerDistance) * 2;
+                    const centerDistance = Math.abs(move.to.col - (BOARD_SIZE-1)/2) + Math.abs(move.to.row - (BOARD_SIZE-1)/2);
+                    score += (BOARD_SIZE - centerDistance) * 2;
                 } else {
                     if (move.to.row > move.from.row) score += 8;
                 }
@@ -2831,13 +2865,11 @@
                     }
                 }
                 
-                if (piece === 2 && move.to.row === 7) score += 40;
+                if (piece === 2 && move.to.row === BOARD_SIZE - 1) score += 40;
                 if (piece === 4) {
-                    const centerDistance = Math.abs(move.to.col - 3.5) + Math.abs(move.to.row - 3.5);
-                    score += (8 - centerDistance) * 3;
-                    if (move.to.row === 3 || move.to.row === 4) {
-                        if (move.to.col === 3 || move.to.col === 4) score += 15;
-                    }
+                    const centerDistance = Math.abs(move.to.col - (BOARD_SIZE-1)/2) + Math.abs(move.to.row - (BOARD_SIZE-1)/2);
+                    score += (BOARD_SIZE - centerDistance) * 3;
+                    if (Math.abs(move.to.row - (BOARD_SIZE-1)/2) <= 2 && Math.abs(move.to.col - (BOARD_SIZE-1)/2) <= 2) score += 15;
                 } else {
                     if (move.to.row > move.from.row) score += 10;
                     if (checkProtection(boardState, move.to.row, move.to.col, 2)) score += 8;
@@ -2916,8 +2948,8 @@
             const currentPlayerPieces = (currentPlayer === 1) ? [1, 3] : [2, 4];
             const enemyPlayerPieces = (currentPlayer === 1) ? [2, 4] : [1, 3];
             
-            for (let row = 0; row < 8; row++) {
-                for (let col = 0; col < 8; col++) {
+            for (let row = 0; row < BOARD_SIZE; row++) {
+                for (let col = 0; col < BOARD_SIZE; col++) {
                     const piece = boardState[row][col];
                     if (currentPlayerPieces.includes(piece)) {
                         playerHasPieces = true;
@@ -2991,7 +3023,7 @@
         
         function showRules() {
             const rules = `
-                📜 Правила русских шашек:
+                📜 Правила русских шашек 32x32:
                 
                 1. Шашки ходят по диагонали на одну клетку вперед
                 2. Дамки ходят на любое количество клеток по диагонали
@@ -3006,16 +3038,16 @@
                 - Цель игры - избавиться от ВСЕХ своих шашек ПЕРВЫМ
                 - Побеждает тот, кто первым остался без шашек
                 
-                Режим "Гладиатор":
-                - 1 игрок против 6 ботов по краям доски (ряды 0 и 7, колонки 0 и 7)
+                Режим "Гладиатор 32x32":
+                - 1 игрок против 23 ботов по краям доски (ряды 0 и 31, колонки 0 и 31)
                 - Все шашки спавнятся на черных клетках границ
-                - Между шашками расстояние минимум 3 клетки (2 белых + черная между ними)
+                - Между шашками расстояние минимум 5 клеток (2 черные клетки между ними)
                 - Все ходят только по диагонали (как обычные шашки)
-                - Каждые 2 хода красная зона расширяется от границ к центру
+                - Боты могут бить друг друга
+                - Каждые 3 хода красная зона расширяется от границ к центру
                 - За 1 ход до расширения зона становится желтой (предупреждение)
                 - В красную и желтую зоны нельзя заходить (НО можно бить через них!)
                 - Если зайти в красную зону - шашка немедленно уничтожается
-                - Боты дерутся друг с другом
                 - Если игрок/бот не может ходить - пропускает ход
                 - Побеждает последний выживший
                 
