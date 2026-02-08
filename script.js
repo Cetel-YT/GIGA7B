@@ -50,14 +50,14 @@ let isPlayerTurn = true;
 let hasContinuingCapture = false;
 
 // Система баффов
-let greenSupplies = 0; // Пропуск обязательного взятия
-let hasPurpleSupply = false; // Двойной ход (не копится)
-let trophies = 0; // Иммунитет к красной зоне
-let redZoneImmunity = false; // Активный иммунитет
+let greenSupplies = 0;
+let hasPurpleSupply = false;
+let trophies = 0;
+let redZoneImmunity = false;
 
-let botBuffs = {}; // Баффы ботов: {botId: {green: count, trophy: count, purple: boolean}}
-let activeSupplies = []; // Активные баффы на карте: {row, col, type, id}
-let supplySpawnCounter = 0; // Счетчик для спавна фиолетовых снабжений
+let botBuffs = {};
+let activeSupplies = [];
+let supplySpawnCounter = 0;
 
 // Администраторы
 const ADMIN_USERS = ['admin', 'administrator', 'супервайзер'];
@@ -453,43 +453,36 @@ function initGladiatorBoard() {
     // Получаем все черные клетки на границах доски
     const borderCells = [];
     
-    // Верхняя граница (ряд 0)
     for (let col = 0; col < BOARD_SIZE_GLADIATOR; col++) {
         if ((0 + col) % 2 === 1) {
             borderCells.push({row: 0, col: col});
         }
     }
     
-    // Нижняя граница (ряд 31)
     for (let col = 0; col < BOARD_SIZE_GLADIATOR; col++) {
         if (((BOARD_SIZE_GLADIATOR-1) + col) % 2 === 1) {
             borderCells.push({row: BOARD_SIZE_GLADIATOR-1, col: col});
         }
     }
     
-    // Левая граница (колонка 0)
     for (let row = 1; row < BOARD_SIZE_GLADIATOR-1; row++) {
         if ((row + 0) % 2 === 1) {
             borderCells.push({row: row, col: 0});
         }
     }
     
-    // Правая граница (колонка 31)
     for (let row = 1; row < BOARD_SIZE_GLADIATOR-1; row++) {
         if ((row + (BOARD_SIZE_GLADIATOR-1)) % 2 === 1) {
             borderCells.push({row: row, col: BOARD_SIZE_GLADIATOR-1});
         }
     }
     
-    // Перемешиваем клетки
     const shuffledCells = [...borderCells].sort(() => Math.random() - 0.5);
     
-    // Размещаем игрока с расстоянием от других шашек
     let placedPlayer = false;
     let placedBots = 0;
     const placedPositions = [];
     
-    // Сначала находим позицию для игрока
     for (let i = 0; i < shuffledCells.length && !placedPlayer; i++) {
         const pos = shuffledCells[i];
         let canPlace = true;
@@ -512,7 +505,6 @@ function initGladiatorBoard() {
         }
     }
     
-    // Размещаем ботов
     for (let i = 0; i < shuffledCells.length && placedBots < 23; i++) {
         const pos = shuffledCells[i];
         if (gladiatorBoard[pos.row][pos.col] !== 0) continue;
@@ -537,7 +529,6 @@ function initGladiatorBoard() {
         }
     }
     
-    // Спавним зеленые припасы (40-50 штук)
     spawnGreenSupplies();
     
     dangerZoneLevel = 0;
@@ -553,12 +544,10 @@ function initGladiatorBoard() {
     boardState = gladiatorBoard;
     updateBoardUI();
     updateDangerZoneDisplay();
-    
-    showNotification('⚔️ Гладиаторская доска 32x32 создана! 1 игрок против 23 ботов');
 }
 
 function spawnGreenSupplies() {
-    const supplyCount = 40 + Math.floor(Math.random() * 11); // 40-50 штук
+    const supplyCount = 40 + Math.floor(Math.random() * 11);
     
     for (let i = 0; i < supplyCount; i++) {
         let attempts = 0;
@@ -568,9 +557,7 @@ function spawnGreenSupplies() {
             const row = Math.floor(Math.random() * BOARD_SIZE_GLADIATOR);
             const col = Math.floor(Math.random() * BOARD_SIZE_GLADIATOR);
             
-            // Только на черных клетках и только там, где нет шашек
             if ((row + col) % 2 === 1 && gladiatorBoard[row][col] === 0) {
-                // Не спавним слишком близко к начальным позициям
                 let tooClose = false;
                 for (let r = Math.max(0, row-3); r <= Math.min(BOARD_SIZE_GLADIATOR-1, row+3); r++) {
                     for (let c = Math.max(0, col-3); c <= Math.min(BOARD_SIZE_GLADIATOR-1, col+3); c++) {
@@ -595,8 +582,6 @@ function spawnGreenSupplies() {
             attempts++;
         }
     }
-    
-    console.log(`✅ Создано ${supplyCount} зеленых припасов`);
 }
 
 function spawnPurpleSupply() {
@@ -607,22 +592,17 @@ function spawnPurpleSupply() {
         const row = Math.floor(Math.random() * BOARD_SIZE_GLADIATOR);
         const col = Math.floor(Math.random() * BOARD_SIZE_GLADIATOR);
         
-        // Только на черных клетках и только там, где нет шашек и других баффов
         if ((row + col) % 2 === 1 && gladiatorBoard[row][col] === 0) {
-            // Проверяем, нет ли тут уже баффа
             const hasBuff = activeSupplies.some(s => s.row === row && s.col === col);
-            if (!hasBuff) {
-                // ИСПРАВЛЕНИЕ: Проверяем, не в красной или желтой зоне ли клетка
-                if (!isInDangerZone(row, col) && !isInWarningZone(row, col)) {
-                    activeSupplies.push({
-                        row: row,
-                        col: col,
-                        type: 'purple',
-                        id: `purple-${Date.now()}`
-                    });
-                    placed = true;
-                    showNotification('💜 На карте появилось фиолетовое снабжение!');
-                }
+            if (!hasBuff && !isInDangerZone(row, col) && !isInWarningZone(row, col)) {
+                activeSupplies.push({
+                    row: row,
+                    col: col,
+                    type: 'purple',
+                    id: `purple-${Date.now()}`
+                });
+                placed = true;
+                showNotification('💜 На карте появилось фиолетовое снабжение!');
             }
         }
         attempts++;
@@ -636,7 +616,6 @@ function checkAndPickupBuff(row, col, player) {
         const supply = activeSupplies[supplyIndex];
         
         if (player === 1) {
-            // Игрок подбирает бафф
             switch(supply.type) {
                 case 'green':
                     greenSupplies++;
@@ -646,31 +625,25 @@ function checkAndPickupBuff(row, col, player) {
                     if (!hasPurpleSupply) {
                         hasPurpleSupply = true;
                         showNotification('💜 Вы подобрали фиолетовое снабжение! Следующий ход будет двойным');
-                    } else {
-                        showNotification('💜 У вас уже есть фиолетовое снабжение');
                     }
                     break;
             }
         } else {
-            // Бот подбирает бафф
             const botKey = findBotAt(row, col);
             if (botKey && botBuffs[botKey]) {
                 switch(supply.type) {
                     case 'green':
                         botBuffs[botKey].green++;
-                        console.log(`🤖 Бот ${botKey} подобрал зеленый припас`);
                         break;
                     case 'purple':
                         if (!botBuffs[botKey].purple) {
                             botBuffs[botKey].purple = true;
-                            console.log(`🤖 Бот ${botKey} подобрал фиолетовое снабжение`);
                         }
                         break;
                 }
             }
         }
         
-        // Удаляем бафф с карты
         activeSupplies.splice(supplyIndex, 1);
         updateBoardUI();
         updateBuffsUI();
@@ -698,7 +671,6 @@ function awardTrophy(toPlayer, toRow, toCol) {
         const botKey = findBotAt(toRow, toCol);
         if (botKey) {
             botBuffs[botKey].trophy++;
-            console.log(`🤖 Бот ${botKey} получил трофей`);
         }
     }
     updateBuffsUI();
@@ -776,7 +748,6 @@ function updateGladiatorUI() {
     document.getElementById('game-status').textContent = playerAlive ? 
         (isPlayerTurn ? 'Ваш ход в гладиаторской битве!' : 'Ход ботов...') : 'Вы выбыли из битвы!';
     
-    // Показываем/скрываем предупреждение
     const warningInfo = document.getElementById('warning-zone-info');
     if (dangerZoneTimer === 1) {
         warningInfo.style.display = 'block';
@@ -785,7 +756,6 @@ function updateGladiatorUI() {
         warningInfo.style.display = 'none';
     }
     
-    // Спавним фиолетовое снабжение раз в 3-4 хода
     supplySpawnCounter++;
     if (supplySpawnCounter >= 3 + Math.floor(Math.random() * 2)) {
         spawnPurpleSupply();
@@ -807,7 +777,6 @@ function updateDangerZoneDisplay() {
             }
         }
         
-        // Показываем желтую зону за 1 ход до расширения
         if (dangerZoneTimer === 1) {
             const warningLevel = dangerZoneLevel + 1;
             if (row < warningLevel || row >= BOARD_SIZE_GLADIATOR - warningLevel || 
@@ -827,25 +796,21 @@ function expandDangerZone() {
     let removedPlayer = false;
     let removedBots = 0;
     
-    // УДАЛЯЕМ ВСЕ ШАШКИ В КРАСНОЙ ЗОНЕ (кроме тех, у кого иммунитет)
     for (let row = 0; row < BOARD_SIZE_GLADIATOR; row++) {
         for (let col = 0; col < BOARD_SIZE_GLADIATOR; col++) {
             if (gladiatorBoard[row][col] !== 0) {
-                // Проверяем, находится ли клетка в красной зоне
                 if (row < dangerZoneLevel || row >= BOARD_SIZE_GLADIATOR - dangerZoneLevel || 
                     col < dangerZoneLevel || col >= BOARD_SIZE_GLADIATOR - dangerZoneLevel) {
                     
                     const player = gladiatorBoard[row][col];
                     
                     if (player === 1) {
-                        // Проверяем иммунитет игрока
                         if (!redZoneImmunity) {
                             removedPlayer = true;
                             playerAlive = false;
                             gladiatorBoard[row][col] = 0;
                             showNotification('🔥 ВАША ШАШКА УНИЧТОЖЕНА КРАСНОЙ ЗОНОЙ!', 'error');
                         } else {
-                            // Иммунитет сработал
                             redZoneImmunity = false;
                             showNotification('🛡️ Ваш иммунитет защитил шашку от красной зоны!');
                         }
@@ -859,9 +824,7 @@ function expandDangerZone() {
                             gladiatorBoard[row][col] = 0;
                             if (botKey) delete botBuffs[botKey];
                         } else {
-                            // Бот использует трофей для защиты
                             botUseTrophy(botKey);
-                            console.log(`🛡️ Бот ${botKey} использовал трофей для защиты от красной зоны`);
                         }
                     }
                 }
@@ -869,7 +832,6 @@ function expandDangerZone() {
         }
     }
     
-    // Удаляем баффы в красной зоне
     activeSupplies = activeSupplies.filter(supply => {
         const inRedZone = supply.row < dangerZoneLevel || 
                          supply.row >= BOARD_SIZE_GLADIATOR - dangerZoneLevel || 
@@ -889,7 +851,6 @@ function expandDangerZone() {
     
     showNotification(`🔥 Красная зона расширилась! Уровень: ${dangerZoneLevel}`);
     
-    // Если игрок умер, заканчиваем игру сразу
     if (removedPlayer) {
         endGladiatorGame('🔥 Вы погибли в красной зоне! Игра окончена.');
         return;
@@ -909,7 +870,6 @@ function getGladiatorAvailableMoves(row, col, player, ignoreMustCapture = false)
     
     let hasCaptures = false;
     
-    // Проверяем возможность взятия
     for (const dir of directions) {
         const captureRow = row + dir.dr;
         const captureCol = col + dir.dc;
@@ -922,7 +882,6 @@ function getGladiatorAvailableMoves(row, col, player, ignoreMustCapture = false)
             gladiatorBoard[jumpRow][jumpCol] === 0) {
             
             if (player === 1) {
-                // Игрок может бить только ботов (2)
                 if (gladiatorBoard[captureRow][captureCol] === 2) {
                     moves.push({
                         row: jumpRow,
@@ -935,7 +894,6 @@ function getGladiatorAvailableMoves(row, col, player, ignoreMustCapture = false)
                     hasCaptures = true;
                 }
             } else if (player === 2) {
-                // Бот может бить и игрока (1), и других ботов (2)
                 moves.push({
                     row: jumpRow,
                     col: jumpCol,
@@ -949,12 +907,10 @@ function getGladiatorAvailableMoves(row, col, player, ignoreMustCapture = false)
         }
     }
     
-    // Если есть взятия и игрок не использует зеленый припас
     if (hasCaptures && !ignoreMustCapture) {
         return moves;
     }
     
-    // Обычные ходы
     for (const dir of directions) {
         const newRow = row + dir.dr;
         const newCol = col + dir.dc;
@@ -962,7 +918,6 @@ function getGladiatorAvailableMoves(row, col, player, ignoreMustCapture = false)
         if (isValidGladiatorPosition(newRow, newCol) && 
             gladiatorBoard[newRow][newCol] === 0) {
             
-            // Проверяем, не в красной/желтой зоне ли клетка
             if (!isInDangerZone(newRow, newCol) && !isInWarningZone(newRow, newCol)) {
                 moves.push({
                     row: newRow,
@@ -1016,7 +971,6 @@ function makeGladiatorMove(toRow, toCol) {
     gladiatorBoard[fromRow][fromCol] = 0;
     gladiatorBoard[toRow][toCol] = player;
     
-    // Обновляем ключ бота в botBuffs если нужно
     if (player === 2) {
         const oldKey = `${fromRow}-${fromCol}`;
         const newKey = `${toRow}-${toCol}`;
@@ -1026,7 +980,6 @@ function makeGladiatorMove(toRow, toCol) {
         }
     }
     
-    // Проверяем подбор баффа
     checkAndPickupBuff(toRow, toCol, player);
     
     if (move.isCapture) {
@@ -1041,11 +994,9 @@ function makeGladiatorMove(toRow, toCol) {
             const botKey = `${move.captureRow}-${move.captureCol}`;
             if (botBuffs[botKey]) delete botBuffs[botKey];
             
-            // Даем трофей за взятие шашки
             awardTrophy(player, toRow, toCol);
         }
         
-        // Проверяем возможность продолжения взятия
         const nextCaptures = getGladiatorAvailableMoves(toRow, toCol, player)
             .filter(m => m.isCapture);
         
@@ -1060,7 +1011,6 @@ function makeGladiatorMove(toRow, toCol) {
         }
     }
     
-    // Проверяем, не находится ли шашка в красной зоне после хода
     if (isInDangerZone(toRow, toCol)) {
         if (player === 1) {
             if (!redZoneImmunity) {
@@ -1084,7 +1034,6 @@ function makeGladiatorMove(toRow, toCol) {
                 showNotification(`🔥 Бот уничтожен красной зоной!`);
             } else {
                 botUseTrophy(botKey);
-                console.log(`🛡️ Бот ${botKey} использовал трофей для защиты от красной зоны`);
             }
         }
     }
@@ -1136,7 +1085,6 @@ function makeGladiatorBotMoves() {
         }
     }
     
-    // Проверяем, есть ли у ботов возможные ходы
     let anyBotCanMove = false;
     for (const bot of bots) {
         const moves = getGladiatorAvailableMoves(bot.row, bot.col, 2);
@@ -1157,7 +1105,7 @@ function makeGladiatorBotMoves() {
     bots.sort(() => Math.random() - 0.5);
     let botIndex = 0;
     let movesMade = 0;
-    const maxMoves = 1; // Боты ходят по одному разу за ход
+    const maxMoves = 1;
     
     function makeNextBotMove() {
         if (botIndex >= bots.length || movesMade >= maxMoves || !playerAlive || botsAlive === 0) {
@@ -1171,7 +1119,6 @@ function makeGladiatorBotMoves() {
         const bot = bots[botIndex];
         const botKey = `${bot.row}-${bot.col}`;
         
-        // Проверяем, может ли бот использовать фиолетовое снабжение
         let canMakeExtraMove = false;
         if (botBuffs[botKey] && botBuffs[botKey].purple) {
             canMakeExtraMove = true;
@@ -1179,11 +1126,9 @@ function makeGladiatorBotMoves() {
         
         let moves = getGladiatorAvailableMoves(bot.row, bot.col, 2);
         
-        // Если у бота есть зеленый припас, он может пропустить обязательное взятие
         if (moves.some(m => m.isCapture) && botBuffs[botKey] && botBuffs[botKey].green > 0) {
-            // Бот может выбрать пропустить взятие
             const normalMoves = getGladiatorAvailableMoves(bot.row, bot.col, 2, true);
-            if (normalMoves.length > 0 && Math.random() < 0.3) { // 30% шанс пропустить
+            if (normalMoves.length > 0 && Math.random() < 0.3) {
                 botUseGreenSupply(botKey);
                 moves = normalMoves;
             }
@@ -1196,14 +1141,12 @@ function makeGladiatorBotMoves() {
                 gladiatorBoard[bot.row][bot.col] = 0;
                 gladiatorBoard[bestMove.row][bestMove.col] = 2;
                 
-                // Обновляем ключ бота
                 const newKey = `${bestMove.row}-${bestMove.col}`;
                 if (botBuffs[botKey]) {
                     botBuffs[newKey] = botBuffs[botKey];
                     delete botBuffs[botKey];
                 }
                 
-                // Проверяем подбор баффа
                 checkAndPickupBuff(bestMove.row, bestMove.col, 2);
                 
                 if (bestMove.isCapture) {
@@ -1218,12 +1161,10 @@ function makeGladiatorBotMoves() {
                         const capturedKey = `${bestMove.captureRow}-${bestMove.captureCol}`;
                         if (botBuffs[capturedKey]) delete botBuffs[capturedKey];
                         
-                        // Даем трофей
                         awardTrophy(2, bestMove.row, bestMove.col);
                     }
                 }
                 
-                // Проверяем красную зону
                 if (isInDangerZone(bestMove.row, bestMove.col)) {
                     const hasImmunity = botBuffs[newKey] && botBuffs[newKey].trophy > 0;
                     
@@ -1234,7 +1175,6 @@ function makeGladiatorBotMoves() {
                         showNotification(`🔥 Бот уничтожен красной зоной! Осталось ботов: ${botsAlive}`);
                     } else {
                         botUseTrophy(newKey);
-                        console.log(`🛡️ Бот ${newKey} использовал трофей для защиты`);
                     }
                 }
                 
@@ -1242,9 +1182,7 @@ function makeGladiatorBotMoves() {
                 updateBoardUI();
                 movesMade++;
                 
-                // Если у бота есть фиолетовое снабжение, он может сделать еще один ход
                 if (canMakeExtraMove && botUsePurpleSupply(newKey)) {
-                    console.log(`🤖 Бот ${newKey} использует фиолетовое снабжение для дополнительного хода`);
                 } else {
                     botIndex++;
                 }
@@ -1273,17 +1211,14 @@ function selectBestBotMove(moves, fromRow, fromCol, botKey) {
         if (move.isCapture) {
             score += 100;
             
-            // Предпочитаем бить игрока
             if (gladiatorBoard[move.captureRow] && 
                 gladiatorBoard[move.captureRow][move.captureCol] === 1) {
                 score += 200;
             }
-            // Если бьем другого бота - хорошо, но меньше очков
             else if (gladiatorBoard[move.captureRow] && 
                      gladiatorBoard[move.captureRow][move.captureCol] === 2) {
                 score += 50;
                 
-                // Проверяем, есть ли у цели трофеи (дополнительная награда)
                 const targetKey = `${move.captureRow}-${move.captureCol}`;
                 if (botBuffs[targetKey] && botBuffs[targetKey].trophy > 0) {
                     score += 30;
@@ -1291,19 +1226,16 @@ function selectBestBotMove(moves, fromRow, fromCol, botKey) {
             }
         }
         
-        // Избегаем желтой и красной зон (но разрешаем взятие в них)
         if (!move.isCapture) {
             if (isInDangerZone(move.row, move.col) || isInWarningZone(move.row, move.col)) {
                 score -= 100;
             }
         }
         
-        // Двигаемся к центру
         const center = (BOARD_SIZE_GLADIATOR - 1) / 2;
         const distanceToCenter = Math.abs(move.row - center) + Math.abs(move.col - center);
         score += (BOARD_SIZE_GLADIATOR * 2 - distanceToCenter) * 2;
         
-        // Держимся подальше от опасной зоны
         const distanceToDanger = Math.min(
             move.row,
             BOARD_SIZE_GLADIATOR - 1 - move.row,
@@ -1312,7 +1244,6 @@ function selectBestBotMove(moves, fromRow, fromCol, botKey) {
         );
         score += distanceToDanger * 5;
         
-        // Стремимся подбирать баффы
         const hasBuff = activeSupplies.some(s => s.row === move.row && s.col === move.col);
         if (hasBuff) {
             const buff = activeSupplies.find(s => s.row === move.row && s.col === move.col);
@@ -1320,7 +1251,6 @@ function selectBestBotMove(moves, fromRow, fromCol, botKey) {
             if (buff.type === 'purple') score += 60;
         }
         
-        // Избегаем клеток, где нас могут побить
         if (isVulnerableGladiator(move.row, move.col, 2)) {
             score -= 80;
         }
@@ -1380,7 +1310,6 @@ function checkGladiatorGameEnd() {
         return;
     }
     
-    // Проверяем, может ли игрок сделать ход
     if (playerAlive && isPlayerTurn) {
         const playerCanMove = canPlayerMakeAnyMove();
         if (!playerCanMove) {
@@ -1401,6 +1330,7 @@ function startGladiatorRound() {
     isPlayerTurn = true;
     hasContinuingCapture = false;
     updatePlayerCards();
+    initBoard(); // ВОТ ОСНОВНОЕ ИСПРАВЛЕНИЕ - вызываем initBoard для создания доски 32x32
     showNotification('⚔️ Гладиаторская битва 32x32 началась! Ваш ход.');
 }
 
@@ -1472,7 +1402,6 @@ function initBoard() {
         }
     }
     
-    // Отображаем баффы на карте (только в гладиаторском режиме)
     if (gladiatorMode) {
         activeSupplies.forEach(supply => {
             const cell = document.querySelector(`.cell[data-row="${supply.row}"][data-col="${supply.col}"]`);
@@ -1482,7 +1411,6 @@ function initBoard() {
                 buff.dataset.type = supply.type;
                 cell.appendChild(buff);
                 
-                // Добавляем подсказку
                 const tooltip = document.createElement('div');
                 tooltip.className = 'buff-tooltip';
                 if (supply.type === 'green') {
@@ -1501,7 +1429,6 @@ function initBoard() {
 function getInitialBoard() {
     const board = Array(BOARD_SIZE_NORMAL).fill().map(() => Array(BOARD_SIZE_NORMAL).fill(0));
     
-    // Игрок (нижняя часть)
     for (let row = 5; row < BOARD_SIZE_NORMAL; row++) {
         for (let col = 0; col < BOARD_SIZE_NORMAL; col++) {
             if ((row + col) % 2 === 1) {
@@ -1510,7 +1437,6 @@ function getInitialBoard() {
         }
     }
     
-    // Бот (верхняя часть)
     for (let row = 0; row < 3; row++) {
         for (let col = 0; col < BOARD_SIZE_NORMAL; col++) {
             if ((row + col) % 2 === 1) {
@@ -1537,10 +1463,9 @@ function handleGladiatorCellClick(row, col) {
         if (selectedChecker && isAvailableMove(row, col)) {
             if (makeGladiatorMove(row, col)) {
                 if (!hasContinuingCapture && playerAlive && botsAlive > 0) {
-                    // Проверяем, нужно ли дать игроку дополнительный ход
                     if (hasPurpleSupply && usePurpleSupply()) {
                         showNotification('💜 Вы используете фиолетовое снабжение для дополнительного хода!');
-                        return; // Игрок остается на ходу
+                        return;
                     }
                     isPlayerTurn = false;
                     setTimeout(() => {
@@ -1577,7 +1502,6 @@ function handleGladiatorCellClick(row, col) {
             if (capturesForThisChecker.length > 0) {
                 selectChecker(row, col);
             } else {
-                // Проверяем, может ли игрок использовать зеленый припас
                 if (greenSupplies > 0) {
                     const normalMoves = getGladiatorAvailableMoves(row, col, 1, true);
                     if (normalMoves.length > 0) {
@@ -1599,10 +1523,9 @@ function handleGladiatorCellClick(row, col) {
     else if (selectedChecker && isAvailableMove(row, col)) {
         if (makeGladiatorMove(row, col)) {
             if (!hasContinuingCapture && playerAlive && botsAlive > 0) {
-                // Проверяем, нужно ли дать игроку дополнительный ход
                 if (hasPurpleSupply && usePurpleSupply()) {
                     showNotification('💜 Вы используете фиолетовое снабжение для дополнительного хода!');
-                    return; // Игрок остается на ходу
+                    return;
                 }
                 isPlayerTurn = false;
                 setTimeout(() => {
@@ -1630,11 +1553,11 @@ function handleNormalCellClick(row, col) {
             }
         } else {
             selectChecker(row, col);
+        }
     }
-}
-else if (selectedChecker && isAvailableMove(row, col)) {
-    makeMove(row, col);
-}
+    else if (selectedChecker && isAvailableMove(row, col)) {
+        makeMove(row, col);
+    }
 }
 
 function selectChecker(row, col) {
@@ -1934,14 +1857,12 @@ function updateBoardUI() {
         }
         cell.className = cellClass;
         
-        // Удаляем старые шашки и баффы
         const oldChecker = cell.querySelector('.checker');
         if (oldChecker) oldChecker.remove();
         
         const oldBuff = cell.querySelector('.buff');
         if (oldBuff) oldBuff.remove();
         
-        // Добавляем шашку
         if (piece !== 0 && (row + col) % 2 === 1) {
             const checker = document.createElement('div');
             if (gladiatorMode) {
@@ -1957,7 +1878,6 @@ function updateBoardUI() {
         }
     });
     
-    // Добавляем баффы (только в гладиаторском режиме)
     if (gladiatorMode) {
         activeSupplies.forEach(supply => {
             const cell = document.querySelector(`.cell[data-row="${supply.row}"][data-col="${supply.col}"]`);
