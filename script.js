@@ -364,6 +364,15 @@ async function resetAllUsersRating() {
 // УПРАВЛЕНИЕ РЕЖИМАМИ ИГРЫ
 // ====================================================
 function setGameMode(mode) {
+    if (gameMode === 'rating' && gameActive) {
+        if (!confirm('Вы находитесь в рейтинговой игре. Если вы смените режим, текущая игра будет засчитана как поражение. Продолжить?')) {
+            return;
+        }
+        endGame(2, true); // поражение при смене режима
+    }
+    
+    if (gameMode === mode) return;
+    
     gameMode = mode;
     gladiatorMode = (mode === 'gladiator');
     
@@ -767,7 +776,7 @@ function updateGladiatorUI() {
     }
     
     supplySpawnCounter++;
-    if (supplySpawnCounter >= 3 + Math.floor(Math.random() * 2)) {
+    if (supplySpawnCounter >= 3) {
         spawnPurpleSupply();
         supplySpawnCounter = 0;
     }
@@ -830,7 +839,7 @@ function expandDangerZone() {
                         
                         if (!hasImmunity) {
                             removedBots++;
-                            botsAlive--;
+                            if (botsAlive > 0) botsAlive--;
                             gladiatorBoard[row][col] = 0;
                             if (botKey) delete botBuffs[botKey];
                         } else {
@@ -904,15 +913,17 @@ function getGladiatorAvailableMoves(row, col, player, ignoreMustCapture = false)
                     hasCaptures = true;
                 }
             } else if (player === 2) {
-                moves.push({
-                    row: jumpRow,
-                    col: jumpCol,
-                    isCapture: true,
-                    captureRow: captureRow,
-                    captureCol: captureCol,
-                    direction: dir
-                });
-                hasCaptures = true;
+                if (gladiatorBoard[captureRow][captureCol] === 1 || gladiatorBoard[captureRow][captureCol] === 2) {
+                    moves.push({
+                        row: jumpRow,
+                        col: jumpCol,
+                        isCapture: true,
+                        captureRow: captureRow,
+                        captureCol: captureCol,
+                        direction: dir
+                    });
+                    hasCaptures = true;
+                }
             }
         }
     }
@@ -985,7 +996,7 @@ function makeGladiatorMove(toRow, toCol) {
         const oldKey = `${fromRow}-${fromCol}`;
         const newKey = `${toRow}-${toCol}`;
         if (botBuffs[oldKey]) {
-            botBuffs[newKey] = botBuffs[oldKey];
+            botBuffs[newKey] = {...botBuffs[oldKey]};
             delete botBuffs[oldKey];
         }
     }
@@ -1000,7 +1011,7 @@ function makeGladiatorMove(toRow, toCol) {
             playerAlive = false;
             showNotification('⚔️ Ваша шашка была взята ботом!', 'error');
         } else if (captured === 2) {
-            botsAlive--;
+            if (botsAlive > 0) botsAlive--;
             const botKey = `${move.captureRow}-${move.captureCol}`;
             if (botBuffs[botKey]) delete botBuffs[botKey];
             
@@ -1038,7 +1049,7 @@ function makeGladiatorMove(toRow, toCol) {
             const hasImmunity = botKey && botBuffs[botKey] && botBuffs[botKey].trophy > 0;
             
             if (!hasImmunity) {
-                botsAlive--;
+                if (botsAlive > 0) botsAlive--;
                 gladiatorBoard[toRow][toCol] = 0;
                 if (botKey) delete botBuffs[botKey];
                 showNotification(`🔥 Бот уничтожен красной зоной!`);
@@ -1110,7 +1121,7 @@ function makeGladiatorBotMoves() {
     let movesMade = 0;
     
     function makeNextBotMove() {
-        if (botIndex >= bots.length || movesMade >= bots.length || !playerAlive || botsAlive === 0) {
+        if (botIndex >= bots.length || movesMade >= 5 || !playerAlive || botsAlive === 0) {
             isPlayerTurn = true;
             updateGladiatorUI();
             updateDangerZoneDisplay();
@@ -1158,7 +1169,7 @@ function makeGladiatorBotMoves() {
                         playerAlive = false;
                         showNotification('⚔️ Ваша шашка была взята ботом!', 'error');
                     } else if (captured === 2) {
-                        botsAlive--;
+                        if (botsAlive > 0) botsAlive--;
                         const capturedKey = `${bestMove.captureRow}-${bestMove.captureCol}`;
                         if (botBuffs[capturedKey]) delete botBuffs[capturedKey];
                         
@@ -1170,7 +1181,7 @@ function makeGladiatorBotMoves() {
                     const hasImmunity = botBuffs[newKey] && botBuffs[newKey].trophy > 0;
                     
                     if (!hasImmunity) {
-                        botsAlive--;
+                        if (botsAlive > 0) botsAlive--;
                         gladiatorBoard[bestMove.row][bestMove.col] = 0;
                         if (botBuffs[newKey]) delete botBuffs[newKey];
                         showNotification(`🔥 Бот уничтожен красной зоной! Осталось ботов: ${botsAlive}`);
@@ -1188,25 +1199,25 @@ function makeGladiatorBotMoves() {
                     // Остаемся на том же боте для дополнительного хода
                     setTimeout(() => {
                         makeNextBotMove();
-                    }, 100);
+                    }, 200);
                     return;
                 } else {
                     botIndex++;
                     setTimeout(() => {
                         makeNextBotMove();
-                    }, 100);
+                    }, 200);
                 }
             } else {
                 botIndex++;
                 setTimeout(() => {
                     makeNextBotMove();
-                }, 50);
+                }, 100);
             }
         } else {
             botIndex++;
             setTimeout(() => {
                 makeNextBotMove();
-            }, 50);
+            }, 100);
         }
     }
     
@@ -1332,29 +1343,49 @@ function checkGladiatorGameEnd() {
         return;
     }
     
-    if (botsAlive === 0) {
+    if (botsAlive <= 0) {
         endGladiatorGame('🎉 Вы победили в гладиаторской битве!');
         return;
     }
     
-    const totalSurvivors = (playerAlive ? 1 : 0) + botsAlive;
-    if (totalSurvivors === 1) {
-        if (playerAlive) {
-            endGladiatorGame('🎉 Вы победили в гладиаторской битве!');
-        } else {
-            endGladiatorGame('Вы проиграли в гладиаторской битве!');
+    // Проверяем, есть ли у игрока хоть один ход
+    let playerCanMove = false;
+    for (let row = 0; row < BOARD_SIZE_GLADIATOR; row++) {
+        for (let col = 0; col < BOARD_SIZE_GLADIATOR; col++) {
+            if (gladiatorBoard[row][col] === 1) {
+                const moves = getGladiatorAvailableMoves(row, col, 1);
+                if (moves.length > 0) {
+                    playerCanMove = true;
+                    break;
+                }
+            }
         }
+        if (playerCanMove) break;
+    }
+    
+    if (!playerCanMove) {
+        endGladiatorGame('😞 У вас не осталось ходов! Вы проиграли.');
         return;
     }
     
-    if (playerAlive && isPlayerTurn) {
-        const playerCanMove = canPlayerMakeAnyMove();
-        if (!playerCanMove) {
-            showNotification('😞 У вас нет возможных ходов! Пропускаем ход...');
-            isPlayerTurn = false;
-            setTimeout(makeGladiatorBotMoves, 1000);
-            return;
+    // Проверяем, есть ли хоть один живой бот с ходами
+    let anyBotCanMove = false;
+    for (let row = 0; row < BOARD_SIZE_GLADIATOR; row++) {
+        for (let col = 0; col < BOARD_SIZE_GLADIATOR; col++) {
+            if (gladiatorBoard[row][col] === 2) {
+                const moves = getGladiatorAvailableMoves(row, col, 2);
+                if (moves.length > 0) {
+                    anyBotCanMove = true;
+                    break;
+                }
+            }
         }
+        if (anyBotCanMove) break;
+    }
+    
+    if (!anyBotCanMove && botsAlive > 0) {
+        endGladiatorGame('🎉 Все оставшиеся боты заблокированы! Вы победили!');
+        return;
     }
     
     updateGladiatorUI();
@@ -1834,11 +1865,11 @@ function makeMove(toRow, toCol) {
             highlightAvailableMoves();
             showNotification('⚠️ Продолжайте взятие!');
             
-            // Если это бот, он должен продолжить взятие
+            // Если это бот, то он должен продолжить взятие
             if (currentPlayer === 2 && gameActive && !botThinking) {
                 setTimeout(() => {
                     makeBotMove();
-                }, 500);
+                }, 300);
             }
             return;
         }
@@ -2017,6 +2048,13 @@ function updatePlayerCards() {
 }
 
 function startNewGame() {
+    if (gameMode === 'rating' && gameActive) {
+        if (!confirm('Вы находитесь в рейтинговой игре. Если вы начнете новую игру, текущая игра будет засчитана как поражение. Продолжить?')) {
+            return;
+        }
+        endGame(2, true); // поражение при начале новой игры
+    }
+    
     console.log('🆕 Начало новой игры');
     
     if (gladiatorMode) {
@@ -2049,10 +2087,10 @@ function makeBotMove() {
     if (!gameActive || currentPlayer !== 2 || botThinking) return;
     
     botThinking = true;
-    const difficulty = document.getElementById('botDifficulty').value;
     
     // Если есть продолжение взятия, используем доступные ходы
     if (selectedChecker && availableMoves.length > 0) {
+        const difficulty = document.getElementById('botDifficulty').value;
         const move = getBestContinueMove(availableMoves, difficulty);
         setTimeout(() => {
             makeMove(move.row, move.col);
@@ -2060,6 +2098,8 @@ function makeBotMove() {
         }, 300);
         return;
     }
+    
+    const difficulty = document.getElementById('botDifficulty').value;
     
     const allMoves = [];
     const allCaptures = getAllCapturesForPlayer(2);
@@ -2122,9 +2162,6 @@ function makeBotMove() {
 }
 
 function getBestContinueMove(moves, difficulty) {
-    // Для продолжения взятия выбираем лучший ход
-    if (moves.length === 0) return moves[0];
-    
     let bestMove = moves[0];
     let bestScore = -Infinity;
     
@@ -2132,45 +2169,21 @@ function getBestContinueMove(moves, difficulty) {
         let score = 0;
         
         // Базовый счет за взятие
-        if (move.isCapture) score += 20;
+        score += 20;
         
         // Учитываем ценность захваченной шашки
-        if (move.captureData) {
-            const capturedPiece = boardState[move.captureData.captureRow][move.captureData.captureCol];
-            if (capturedPiece === 3 || capturedPiece === 4) score += 15;
-        }
+        const capturedPiece = boardState[move.captureRow][move.captureCol];
+        if (capturedPiece === 3 || capturedPiece === 4) score += 15;
         
         // Проверяем, ведет ли ход к дальнейшим взятиям
         const tempBoard = JSON.parse(JSON.stringify(boardState));
         tempBoard[move.row][move.col] = tempBoard[selectedChecker.row][selectedChecker.col];
         tempBoard[selectedChecker.row][selectedChecker.col] = 0;
-        if (move.isCapture && move.captureData) {
-            tempBoard[move.captureData.captureRow][move.captureData.captureCol] = 0;
-        }
+        tempBoard[move.captureRow][move.captureCol] = 0;
         
         const nextCaptures = getCapturesForChecker(move.row, move.col);
         if (nextCaptures.length > 0) {
             score += 25;
-            
-            // Для экспертного уровня дополнительная оценка
-            if (difficulty === 'expert') {
-                let maxFutureCaptures = 0;
-                nextCaptures.forEach(nextCapture => {
-                    // Рекурсивно оцениваем цепочку взятий
-                    let futureCaptures = 1;
-                    const tempBoard2 = JSON.parse(JSON.stringify(tempBoard));
-                    tempBoard2[nextCapture.row][nextCapture.col] = tempBoard2[move.row][move.col];
-                    tempBoard2[move.row][move.col] = 0;
-                    if (nextCapture.isCapture && nextCapture.captureData) {
-                        tempBoard2[nextCapture.captureData.captureRow][nextCapture.captureData.captureCol] = 0;
-                    }
-                    
-                    const nextNextCaptures = getCapturesForChecker(nextCapture.row, nextCapture.col);
-                    futureCaptures += nextNextCaptures.length;
-                    maxFutureCaptures = Math.max(maxFutureCaptures, futureCaptures);
-                });
-                score += maxFutureCaptures * 10;
-            }
         }
         
         // Избегаем опасных позиций
@@ -2389,7 +2402,7 @@ function checkGameEnd() {
     }
 }
 
-function endGame(result) {
+function endGame(result, manualEnd = false) {
     gameActive = false;
     let message = '';
     let gameResult = '';
@@ -2407,7 +2420,7 @@ function endGame(result) {
             message = '🎉 Вы победили в рейтинговой игре!';
             gameResult = 'win';
         } else {
-            message = '😞 Вы проиграли в рейтинговой игре';
+            message = manualEnd ? '⚠️ Вы сдались или прервали рейтинговую игру!' : '😞 Вы проиграли в рейтинговой игре';
             gameResult = 'loss';
         }
     } else {
@@ -2428,7 +2441,7 @@ function endGame(result) {
 
 function surrender() {
     if (!gameActive) return;
-    if (confirm('Вы уверены, что хотите сдаться?')) endGame(2);
+    if (confirm('Вы уверены, что хотите сдаться?')) endGame(2, true);
 }
 
 function showRules() {
@@ -2469,7 +2482,7 @@ function showRules() {
            - Можно копить несколько штук
            - Подбирается при заходе на клетку
         
-        2. 💜 Фиолетовое снабжение (появляется раз в 3-4 хода):
+        2. 💜 Фиолетовое снабжение (появляется раз в 3 хода):
            - Дает возможность сделать два хода подряд
            - Не копится (можно иметь только одно)
            - Автоматически используется при получении
@@ -2490,6 +2503,7 @@ function showRules() {
         - После калибровки рейтинг от 1000 до 4000
         - Рейтинг меняется ТОЛЬКО в рейтинговом режиме
         - В рейтинговом режиме всегда игра против эксперта
+        - При смене режима или начале новой игры до окончания партии засчитывается поражение
         
         Удачи в игре! 🎮
     `;
