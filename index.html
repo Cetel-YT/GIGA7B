@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Онлайн шашки</title>
+    <title>Онлайн шашки maha W</title>
     
     <!-- Firebase SDK -->
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
@@ -1072,11 +1072,12 @@
                 <div id="gladiator-controls">
                     <h3>⚔️ Гладиаторский режим</h3>
                     <div id="gladiator-timer">
-                        До следующего перемещения: <span id="move-timer">10</span> сек
+                        До конца хода: <span id="move-timer">10</span> сек
                     </div>
                     <div id="gladiator-navigation">
-                        <button class="btn btn-gladiator" onclick="moveToAdjacentBoard(-1, 0)" id="gladiator-left-btn">← Левое поле</button>
-                        <button class="btn btn-gladiator" onclick="moveToAdjacentBoard(1, 0)" id="gladiator-right-btn">Правое поле →</button>
+                        <div style="text-align: center; width: 100%;">
+                            <p>Раунд: <span id="gladiator-round">1</span></p>
+                        </div>
                     </div>
                     <div id="gladiator-players">
                         Игроков в режиме: <span id="gladiator-players-count">1</span>
@@ -1098,7 +1099,7 @@
                         <p>Ваши шашки: <span id="player1-pieces">12</span></p>
                         <p>Шашки бота: <span id="player2-pieces">12</span></p>
                         <p>Дамки: <span id="kings-count">0</span></p>
-                        <p id="gladiator-info" style="display: none;">Поле: <span id="current-board">1</span>/8 (2x4 сетка)</p>
+                        <p id="gladiator-info" style="display: none;">Раунд: <span id="gladiator-round-display">1</span></p>
                     </div>
                 </div>
                 
@@ -1164,13 +1165,13 @@
         let fogOfWarActive = false;
         let revealedCells = new Set();
         
-        // Гладиаторский режим
+        // Гладиаторский режим (КОРРЕКТНО)
         let gladiatorMode = false;
-        let currentBoardIndex = 0;
-        let gladiatorBoards = [];
-        let moveTimer = 10;
-        let moveTimerInterval = null;
-        let gladiatorPlayers = new Set();
+        let gladiatorGameActive = false;
+        let gladiatorTurnTimer = 10;
+        let gladiatorTurnInterval = null;
+        let gladiatorCurrentRound = 0;
+        let gladiatorWaitingForTurn = false;
         
         // Улучшенный ИИ
         let botMemory = [];
@@ -1206,9 +1207,6 @@
                 
                 // Настройка обработчиков клавиш
                 setupEventListeners();
-                
-                // Инициализация гладиаторских досок
-                initGladiatorBoards();
                 
             } catch (error) {
                 console.error('❌ Ошибка инициализации Firebase:', error);
@@ -1362,9 +1360,9 @@
                 }
                 
                 // Останавливаем таймер гладиаторского режима
-                if (moveTimerInterval) {
-                    clearInterval(moveTimerInterval);
-                    moveTimerInterval = null;
+                if (gladiatorTurnInterval) {
+                    clearInterval(gladiatorTurnInterval);
+                    gladiatorTurnInterval = null;
                 }
                 
                 // Обновляем статус пользователя
@@ -1502,21 +1500,18 @@
         function setGameMode(mode) {
             // Если выходим из гладиаторского режима, останавливаем таймер
             if (gladiatorMode && mode !== 'gladiator') {
-                if (moveTimerInterval) {
-                    clearInterval(moveTimerInterval);
-                    moveTimerInterval = null;
+                if (gladiatorTurnInterval) {
+                    clearInterval(gladiatorTurnInterval);
+                    gladiatorTurnInterval = null;
                 }
                 
                 // Скрываем стрелки навигации
                 document.getElementById('board-navigation-arrows').style.display = 'none';
+                document.getElementById('board-navigation').style.display = 'none';
                 
                 // Сбрасываем состояние гладиаторского режима
                 gladiatorMode = false;
-                currentBoardIndex = 0;
-                gladiatorBoards = [];
-                
-                // Переинициализируем доски (но они будут перезаписаны при старте новой игры)
-                initGladiatorBoards();
+                gladiatorGameActive = false;
                 
                 console.log('🔄 Выход из гладиаторского режима, состояние сброшено');
             }
@@ -1533,18 +1528,18 @@
             let activeClass = 'active';
             if (mode === 'rating') activeClass = 'rating-active';
             if (mode === 'gladiator') activeClass = 'gladiator-active';
-            event.target.classList.add(activeClass);
+            
+            // Находим кнопку с нужным режимом
+            const modeButtons = document.querySelectorAll('.mode-btn');
+            for (let btn of modeButtons) {
+                if (btn.textContent.includes(getModeDisplayName(mode))) {
+                    btn.classList.add(activeClass);
+                    break;
+                }
+            }
             
             // Обновляем отображение режима
-            const modeNames = {
-                'normal': 'Обычные шашки',
-                'giveaway': 'Поддавки',
-                'fog': 'Туман войны',
-                'rating': '🏆 Рейтинговая игра',
-                'gladiator': '⚔️ Гладиаторский режим'
-            };
-            
-            document.getElementById('game-mode-display').textContent = modeNames[mode];
+            document.getElementById('game-mode-display').textContent = getModeDisplayName(mode);
             document.getElementById('fog-info').style.display = fogOfWarActive ? 'block' : 'none';
             document.getElementById('gladiator-info').style.display = gladiatorMode ? 'block' : 'none';
             
@@ -1558,33 +1553,43 @@
                 document.getElementById('board-navigation-arrows').style.display = 'none';
                 showNotification('🏆 Рейтинговая игра! Сложность: эксперт');
             } else if (mode === 'gladiator') {
-                document.getElementById('bot-controls').style.display = 'block';
+                document.getElementById('bot-controls').style.display = 'none';
                 document.getElementById('gladiator-controls').style.display = 'block';
                 document.getElementById('board-navigation').style.display = 'none';
-                document.getElementById('board-navigation-arrows').style.display = 'block'; // Показываем стрелки
+                document.getElementById('board-navigation-arrows').style.display = 'none';
                 
-                // Обновляем информацию о положении на сетке
-                const row = Math.floor(currentBoardIndex / 4);
-                const col = currentBoardIndex % 4;
-                document.getElementById('current-board').textContent = `${currentBoardIndex + 1} (${row + 1},${col + 1})`;
+                // В гладиаторском режиме противники - другие игроки, а не бот
+                document.getElementById('player2-name').textContent = 'Другие игроки';
+                document.getElementById('player2-rating').textContent = 'Режим: Онлайн';
                 
-                updateBotLevel();
                 startGladiatorMode();
-                showNotification('⚔️ Гладиаторский режим! 8 полей (2x4 сетка), перемещение каждые 10 секунд');
+                showNotification('⚔️ Гладиаторский режим! Все ходят каждые 10 секунд');
             } else {
                 document.getElementById('bot-controls').style.display = 'block';
                 document.getElementById('gladiator-controls').style.display = 'none';
                 document.getElementById('board-navigation').style.display = 'none';
                 document.getElementById('board-navigation-arrows').style.display = 'none';
+                document.getElementById('player2-name').textContent = 'Бот';
                 updateBotLevel();
             }
             
-            showNotification(`✅ Режим изменен: ${modeNames[mode]}`);
+            showNotification(`✅ Режим изменен: ${getModeDisplayName(mode)}`);
             
             // Перезапускаем игру с новым режимом
             if (gameActive) {
                 startNewGame();
             }
+        }
+        
+        function getModeDisplayName(mode) {
+            const modeNames = {
+                'normal': 'Обычные шашки',
+                'giveaway': 'Поддавки',
+                'fog': 'Туман войны',
+                'rating': 'Рейтинговая игра',
+                'gladiator': 'Гладиаторский режим'
+            };
+            return modeNames[mode] || mode;
         }
         
         // ====================================================
@@ -1595,7 +1600,7 @@
             board.innerHTML = '';
             
             if (gladiatorMode) {
-                boardState = gladiatorBoards[currentBoardIndex];
+                boardState = getGladiatorInitialBoard();
             } else {
                 boardState = getInitialBoard();
             }
@@ -1652,6 +1657,58 @@
                 updateFogDisplay();
             }
             updateGameStats();
+        }
+        
+        function getInitialBoard() {
+            const board = Array(8).fill().map(() => Array(8).fill(0));
+            
+            // Стандартная расстановка для русских шашек
+            for (let row = 5; row < 8; row++) {
+                for (let col = 0; col < 8; col++) {
+                    if ((row + col) % 2 === 1) {
+                        board[row][col] = 1; // Шашки игрока
+                    }
+                }
+            }
+            
+            for (let row = 0; row < 3; row++) {
+                for (let col = 0; col < 8; col++) {
+                    if ((row + col) % 2 === 1) {
+                        board[row][col] = 2; // Шашки бота
+                    }
+                }
+            }
+            
+            return board;
+        }
+        
+        function getGladiatorInitialBoard() {
+            const board = Array(8).fill().map(() => Array(8).fill(0));
+            
+            // Игрок начинает с одной шашки на случайной черной клетке
+            let placed = false;
+            let attempts = 0;
+            
+            while (!placed && attempts < 100) {
+                const row = Math.floor(Math.random() * 8);
+                const col = Math.floor(Math.random() * 8);
+                
+                // Проверяем, что клетка черная (сумма координат нечетная) и пустая
+                if ((row + col) % 2 === 1 && board[row][col] === 0) {
+                    // Ставим шашку игрока
+                    board[row][col] = 1;
+                    placed = true;
+                    console.log(`🎮 Гладиатор: игрок спавнится на позиции ${row},${col} (черная клетка)`);
+                }
+                attempts++;
+            }
+            
+            // Если не удалось разместить, ставим в центр на черную клетку
+            if (!placed) {
+                board[4][3] = 1;
+            }
+            
+            return board;
         }
         
         function isCellVisible(row, col) {
@@ -1739,31 +1796,14 @@
             });
         }
         
-        function getInitialBoard() {
-            const board = Array(8).fill().map(() => Array(8).fill(0));
-            
-            // Стандартная расстановка для русских шашек
-            for (let row = 5; row < 8; row++) {
-                for (let col = 0; col < 8; col++) {
-                    if ((row + col) % 2 === 1) {
-                        board[row][col] = 1; // Шашки игрока
-                    }
-                }
-            }
-            
-            for (let row = 0; row < 3; row++) {
-                for (let col = 0; col < 8; col++) {
-                    if ((row + col) % 2 === 1) {
-                        board[row][col] = 2; // Шашки бота
-                    }
-                }
-            }
-            
-            return board;
-        }
-        
         function handleCellClick(row, col) {
             if (!gameActive || botThinking || currentPlayer !== 1) {
+                return;
+            }
+            
+            // В гладиаторском режиме проверяем, идет ли сейчас ход
+            if (gladiatorMode && !gladiatorWaitingForTurn) {
+                showNotification('⏳ Сейчас не время для хода. Ждем других игроков.');
                 return;
             }
             
@@ -1972,6 +2012,7 @@
                     while (isValidPosition(currentRow, currentCol)) {
                         if (boardState[currentRow][currentCol] === 0) {
                             if (foundEnemy) {
+                                // В режиме тумана войны разрешаем взятие даже на скрытые клетки
                                 captures.push({
                                     row: currentRow,
                                     col: currentCol,
@@ -2091,6 +2132,13 @@
             updateBoardUI();
             clearSelection();
             
+            // В гладиаторском режиме ход завершается после одного действия игрока
+            if (gladiatorMode) {
+                // Фиксируем ход игрока
+                endGladiatorTurn();
+                return;
+            }
+            
             currentPlayer = currentPlayer === 1 ? 2 : 1;
             moveCount++;
             updateGameStats();
@@ -2133,9 +2181,6 @@
             
             // В гладиаторском режиме боты не ходят
             if (gameMode === 'gladiator') {
-                currentPlayer = 1; // Возвращаем ход игроку
-                updatePlayerCards();
-                document.getElementById('game-status').textContent = 'Ваш ход';
                 return;
             }
             
@@ -2503,6 +2548,12 @@
         function endGame(winner) {
             gameActive = false;
             
+            // В гладиаторском режиме останавливаем таймер
+            if (gladiatorMode && gladiatorTurnInterval) {
+                clearInterval(gladiatorTurnInterval);
+                gladiatorTurnInterval = null;
+            }
+            
             let message = '';
             let gameResult = '';
             
@@ -2524,9 +2575,9 @@
                 }
             } else if (gameMode === 'gladiator') {
                 if (winner === 1) {
-                    message = '🎉 Вы победили на этом поле!';
+                    message = '🎉 Вы победили в гладиаторском режиме!';
                 } else {
-                    message = '😞 Вы проиграли на этом поле';
+                    message = '😞 Вы проиграли в гладиаторском режиме';
                 }
             } else {
                 if (winner === 1) {
@@ -2576,6 +2627,10 @@
             document.getElementById('player1-pieces').textContent = player1Pieces;
             document.getElementById('player2-pieces').textContent = player2Pieces;
             document.getElementById('kings-count').textContent = kingsCount;
+            
+            if (gladiatorMode) {
+                document.getElementById('gladiator-round-display').textContent = gladiatorCurrentRound;
+            }
         }
         
         function addMoveToHistory(fromRow, fromCol, toRow, toCol, isCapture) {
@@ -2625,12 +2680,7 @@
                 updateFogDisplay();
             }
             
-            if (gladiatorMode) {
-                // В гладиаторском режиме загружаем текущую доску
-                boardState = gladiatorBoards[currentBoardIndex];
-            } else {
-                boardState = getInitialBoard();
-            }
+            boardState = getInitialBoard();
             
             currentPlayer = 1;
             gameActive = true;
@@ -2683,13 +2733,13 @@
                 Особенности режима "Туман войны":
                 - Видны только клетки в радиусе 2 клеток от ваших шашек
                 - Шашки противника скрыты, пока вы не подойдете близко
+                - Можно бить шашки даже через скрытые клетки
                 
-                Режим "Гладиатор" (только онлайн-игроки):
-                - 8 игровых полей (сетка 2x4)
-                - Каждый игрок начинает с ОДНОЙ шашкой на случайном поле
-                - Можно перемещаться между полями каждые 10 секунд
-                - Стрелки по краям доски для навигации
+                Режим "Гладиатор" (онлайн):
+                - Все игроки ходят одновременно каждые 10 секунд
+                - Каждый игрок начинает с ОДНОЙ шашки на случайной черной клетке
                 - Цель - выживать как можно дольше
+                - Противники - другие онлайн-игроки
                 
                 Рейтинговая система:
                 - Первые 3 игры - калибровочные
@@ -2720,127 +2770,87 @@
         }
         
         // ====================================================
-        // ГЛАДИАТОРСКИЙ РЕЖИМ
+        // ГЛАДИАТОРСКИЙ РЕЖИМ (КОРРЕКТНАЯ РЕАЛИЗАЦИЯ)
         // ====================================================
-        function initGladiatorBoards() {
-            gladiatorBoards = [];
+        function startGladiatorMode() {
+            console.log('⚔️ Запуск гладиаторского режима');
             
-            // Создаем 8 пустых досок (без шашек бота)
-            for (let i = 0; i < 8; i++) {
-                const board = Array(8).fill().map(() => Array(8).fill(0));
-                gladiatorBoards.push(board);
+            // Останавливаем старый интервал если есть
+            if (gladiatorTurnInterval) {
+                clearInterval(gladiatorTurnInterval);
             }
             
-            // Игрок спавнится на случайной доске с одной шашкой
-            const spawnBoardIndex = Math.floor(Math.random() * 8);
-            currentBoardIndex = spawnBoardIndex;
+            gladiatorGameActive = true;
+            gladiatorCurrentRound = 0;
+            gladiatorWaitingForTurn = false;
+            gameActive = true;
             
-            // Находим безопасное место для спавна (далеко от краев, защищенное)
-            const safeSpawnPositions = [
-                {row: 4, col: 3}, {row: 4, col: 4},
-                {row: 3, col: 3}, {row: 3, col: 4}
-            ];
+            // Инициализируем доску для гладиаторского режима
+            initBoard();
             
-            const spawnPos = safeSpawnPositions[Math.floor(Math.random() * safeSpawnPositions.length)];
-            gladiatorBoards[currentBoardIndex][spawnPos.row][spawnPos.col] = 1;
-            
-            console.log(`🎮 Гладиатор: игрок спавнится на поле ${currentBoardIndex + 1}, позиция ${spawnPos.row},${spawnPos.col}`);
+            // Запускаем первый раунд
+            startGladiatorTurn();
         }
         
-        function moveToAdjacentBoard(dx, dy) {
-            // Вычисляем новую позицию доски (представляем 8 досок как 2x4)
-            let newRow = Math.floor(currentBoardIndex / 4) + dy;
-            let newCol = (currentBoardIndex % 4) + dx;
+        function startGladiatorTurn() {
+            gladiatorTurnTimer = 10;
+            gladiatorWaitingForTurn = true;
+            gladiatorCurrentRound++;
             
-            // Проверяем границы
-            if (newRow < 0 || newRow >= 2 || newCol < 0 || newCol >= 4) {
-                showNotification('⚠️ Невозможно переместиться за пределы арены');
-                return;
-            }
-            
-            const newBoardIndex = newRow * 4 + newCol;
-            
-            // Сохраняем текущее состояние доски
-            gladiatorBoards[currentBoardIndex] = JSON.parse(JSON.stringify(boardState));
-            
-            // Переключаемся на новую доску
-            currentBoardIndex = newBoardIndex;
-            
-            // Загружаем новое состояние
-            boardState = JSON.parse(JSON.stringify(gladiatorBoards[currentBoardIndex]));
-            
-            // Сбрасываем состояние игры
+            // Разрешаем игроку ходить
             gameActive = true;
-            currentPlayer = 1;
             selectedChecker = null;
             availableMoves = [];
-            moveCount = 0;
             
             // Обновляем UI
-            const row = Math.floor(currentBoardIndex / 4);
-            const col = currentBoardIndex % 4;
-            document.getElementById('current-board').textContent = `${currentBoardIndex + 1} (${row + 1},${col + 1})`;
+            document.getElementById('move-timer').textContent = gladiatorTurnTimer;
+            document.getElementById('gladiator-round').textContent = gladiatorCurrentRound;
+            document.getElementById('gladiator-round-display').textContent = gladiatorCurrentRound;
+            document.getElementById('game-status').textContent = `Раунд ${gladiatorCurrentRound}. Ваш ход! (${gladiatorTurnTimer} сек)`;
             
-            initBoard();
-            updateGameStats();
-            updatePlayerCards();
-            document.getElementById('moves-history').innerHTML = '';
-            document.getElementById('game-status').textContent = `Поле ${currentBoardIndex + 1}. Ваш ход`;
-            
-            // Сбрасываем таймер
-            moveTimer = 10;
-            document.getElementById('move-timer').textContent = moveTimer;
-            
-            showNotification(`Перемещение на поле ${currentBoardIndex + 1} (${row + 1},${col + 1})`);
-        }
-        
-        function startGladiatorMode() {
-            // Сбрасываем таймер
-            moveTimer = 10;
-            document.getElementById('move-timer').textContent = moveTimer;
-            
-            // Обновляем позицию на сетке
-            const row = Math.floor(currentBoardIndex / 4);
-            const col = currentBoardIndex % 4;
-            document.getElementById('current-board').textContent = `${currentBoardIndex + 1} (${row + 1},${col + 1})`;
-            
-            // Очищаем предыдущий интервал
-            if (moveTimerInterval) {
-                clearInterval(moveTimerInterval);
-            }
-            
-            // Запускаем новый таймер
-            moveTimerInterval = setInterval(() => {
-                moveTimer--;
-                document.getElementById('move-timer').textContent = moveTimer;
+            // Запускаем таймер хода
+            gladiatorTurnInterval = setInterval(() => {
+                gladiatorTurnTimer--;
+                document.getElementById('move-timer').textContent = gladiatorTurnTimer;
+                document.getElementById('game-status').textContent = `Раунд ${gladiatorCurrentRound}. Ваш ход! (${gladiatorTurnTimer} сек)`;
                 
-                if (moveTimer <= 0) {
-                    moveTimer = 10;
-                    // Автоматическое перемещение на случайное соседнее поле
-                    const directions = [
-                        { dx: -1, dy: 0 }, // Влево
-                        { dx: 1, dy: 0 },  // Вправо
-                        { dx: 0, dy: -1 }, // Вверх
-                        { dx: 0, dy: 1 }   // Вниз
-                    ];
-                    
-                    // Фильтруем только допустимые направления
-                    const validDirections = directions.filter(dir => {
-                        const newRow = Math.floor(currentBoardIndex / 4) + dir.dy;
-                        const newCol = (currentBoardIndex % 4) + dir.dx;
-                        return newRow >= 0 && newRow < 2 && newCol >= 0 && newCol < 4;
-                    });
-                    
-                    if (validDirections.length > 0) {
-                        const randomDir = validDirections[Math.floor(Math.random() * validDirections.length)];
-                        moveToAdjacentBoard(randomDir.dx, randomDir.dy);
-                    }
+                if (gladiatorTurnTimer <= 0) {
+                    // Время хода вышло
+                    endGladiatorTurn();
                 }
             }, 1000);
+        }
+        
+        function endGladiatorTurn() {
+            if (!gladiatorGameActive) return;
             
-            // Показываем информацию о сетке
-            document.getElementById('gladiator-info').innerHTML = 
-                `Поле: <span id="current-board">${currentBoardIndex + 1} (${row + 1},${col + 1})</span>/8 (2x4 сетка)`;
+            clearInterval(gladiatorTurnInterval);
+            gladiatorWaitingForTurn = false;
+            
+            // Блокируем ходы
+            gameActive = false;
+            clearSelection();
+            
+            // Отправляем состояние доски на сервер (в будущем)
+            sendGladiatorMoveToServer();
+            
+            // Показываем сообщение
+            document.getElementById('game-status').textContent = `Раунд ${gladiatorCurrentRound} завершен. Ожидание других игроков...`;
+            
+            // Через 3 секунды начинаем новый раунд (имитация ожидания других игроков)
+            setTimeout(() => {
+                if (gladiatorGameActive) {
+                    startGladiatorTurn();
+                }
+            }, 3000);
+        }
+        
+        function sendGladiatorMoveToServer() {
+            // В будущем здесь будет отправка хода на сервер и синхронизация с другими игроками
+            console.log(`📤 Гладиатор: отправка состояния раунда ${gladiatorCurrentRound} на сервер`);
+            
+            // Здесь будет код для отправки данных в Firebase
+            // database.ref('gladiator/games/...').push(...);
         }
         
         function findGladiatorGame() {
@@ -2849,11 +2859,12 @@
         }
         
         function leaveGladiatorGame() {
-            if (moveTimerInterval) {
-                clearInterval(moveTimerInterval);
-                moveTimerInterval = null;
+            if (gladiatorTurnInterval) {
+                clearInterval(gladiatorTurnInterval);
+                gladiatorTurnInterval = null;
             }
             
+            gladiatorGameActive = false;
             setGameMode('normal');
         }
         
@@ -3168,9 +3179,9 @@
             }
             
             // Останавливаем таймер гладиаторского режима
-            if (moveTimerInterval) {
-                clearInterval(moveTimerInterval);
-                moveTimerInterval = null;
+            if (gladiatorTurnInterval) {
+                clearInterval(gladiatorTurnInterval);
+                gladiatorTurnInterval = null;
             }
             
             document.getElementById('auth').style.display = 'block';
@@ -3339,4 +3350,3 @@
      </script>
 </body>
 </html>
-
