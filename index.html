@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Онлайн шашки D</title>
+    <title>Онлайн шашки 2</title>
     
     <!-- Firebase SDK -->
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
@@ -1111,6 +1111,7 @@
         let botsAlive = 6;
         let gladiatorBoard = [];
         let isPlayerTurn = true;
+        let hasContinuingCapture = false; // Флаг для продолжения взятия
         
         // Администраторы
         const ADMIN_USERS = ['admin', 'administrator', 'супервайзер'];
@@ -1486,51 +1487,29 @@
         }
         
         // ====================================================
-        // ГЛАДИАТОРСКИЙ РЕЖИМ
+        // ГЛАДИАТОРСКИЙ РЕЖИМ - ИСПРАВЛЕННЫЙ КОД
         // ====================================================
         function initGladiatorBoard() {
             gladiatorBoard = Array(8).fill().map(() => Array(8).fill(0));
             
-            // ЧЕРНЫЕ клетки на границах доски (ряды 0 и 7, колонки 0 и 7)
-            // Только черные клетки: (row + col) % 2 === 1
-            const borderCells = [];
-            
-            // Верхняя граница (ряд 0)
-            for (let col = 0; col < 8; col++) {
-                if ((0 + col) % 2 === 1) { // Черная клетка
-                    borderCells.push({row: 0, col: col});
-                }
-            }
-            
-            // Нижняя граница (ряд 7)
-            for (let col = 0; col < 8; col++) {
-                if ((7 + col) % 2 === 1) { // Черная клетка
-                    borderCells.push({row: 7, col: col});
-                }
-            }
-            
-            // Левая граница (колонка 0) - кроме углов
-            for (let row = 1; row < 7; row++) {
-                if ((row + 0) % 2 === 1) { // Черная клетка
-                    borderCells.push({row: row, col: 0});
-                }
-            }
-            
-            // Правая граница (колонка 7) - кроме углов
-            for (let row = 1; row < 7; row++) {
-                if ((row + 7) % 2 === 1) { // Черная клетка
-                    borderCells.push({row: row, col: 7});
+            // Получаем список всех черных клеток на доске
+            const allBlackCells = [];
+            for (let row = 0; row < 8; row++) {
+                for (let col = 0; col < 8; col++) {
+                    if ((row + col) % 2 === 1) { // Только черные клетки
+                        allBlackCells.push({ row, col });
+                    }
                 }
             }
             
             // Перемешиваем клетки
-            const shuffledCells = [...borderCells].sort(() => Math.random() - 0.5);
+            const shuffledCells = [...allBlackCells].sort(() => Math.random() - 0.5);
             
             // Размещаем игрока
             const playerPos = shuffledCells[0];
             gladiatorBoard[playerPos.row][playerPos.col] = 1;
             
-            // Размещаем ботов с расстоянием минимум 1 черная клетка
+            // Размещаем ботов с минимальным расстоянием
             let placedBots = 0;
             let index = 1;
             
@@ -1542,9 +1521,10 @@
                 for (let row = 0; row < 8; row++) {
                     for (let col = 0; col < 8; col++) {
                         if (gladiatorBoard[row][col] !== 0) {
-                            // Расстояние Манхэттена должно быть > 1
-                            const distance = Math.abs(row - pos.row) + Math.abs(col - pos.col);
-                            if (distance <= 1) {
+                            // Рассчитываем манхэттенское расстояние
+                            const manhattanDistance = Math.abs(row - pos.row) + Math.abs(col - pos.col);
+                            // Расстояние должно быть минимум 2 (соседние клетки по диагонали имеют расстояние 2)
+                            if (manhattanDistance < 2) {
                                 canPlace = false;
                                 break;
                             }
@@ -1562,13 +1542,38 @@
             }
             
             // Если не удалось разместить всех ботов с расстоянием, размещаем в оставшиеся клетки
-            while (placedBots < 6 && index < shuffledCells.length) {
-                const pos = shuffledCells[index];
-                if (gladiatorBoard[pos.row][pos.col] === 0) {
+            // но сначала попробуем разместить по краям доски
+            if (placedBots < 6) {
+                // Получаем клетки по краям доски (ряды 0 и 7, колонки 0 и 7)
+                const borderCells = [];
+                for (let row = 0; row < 8; row++) {
+                    for (let col = 0; col < 8; col++) {
+                        if ((row + col) % 2 === 1 && (row === 0 || row === 7 || col === 0 || col === 7)) {
+                            if (gladiatorBoard[row][col] === 0) {
+                                borderCells.push({ row, col });
+                            }
+                        }
+                    }
+                }
+                
+                const shuffledBorderCells = [...borderCells].sort(() => Math.random() - 0.5);
+                
+                for (const pos of shuffledBorderCells) {
+                    if (placedBots >= 6) break;
                     gladiatorBoard[pos.row][pos.col] = 2;
                     placedBots++;
                 }
-                index++;
+            }
+            
+            // Если все еще не разместили, размещаем в любые свободные черные клетки
+            if (placedBots < 6) {
+                for (const cell of shuffledCells) {
+                    if (placedBots >= 6) break;
+                    if (gladiatorBoard[cell.row][cell.col] === 0) {
+                        gladiatorBoard[cell.row][cell.col] = 2;
+                        placedBots++;
+                    }
+                }
             }
             
             dangerZoneLevel = 0;
@@ -1578,13 +1583,14 @@
             playerAlive = true;
             botsAlive = 6;
             isPlayerTurn = true;
+            hasContinuingCapture = false;
             
             updateGladiatorUI();
             boardState = gladiatorBoard;
             updateBoardUI();
             updateDangerZoneDisplay();
             
-            showNotification('⚔️ Гладиаторская доска создана! 1 игрок против 6 ботов на границе карты');
+            showNotification('⚔️ Гладиаторская доска создана! 1 игрок против 6 ботов');
         }
         
         function updateGladiatorUI() {
@@ -1706,7 +1712,7 @@
                     gladiatorBoard[captureRow][captureCol] === enemy &&
                     gladiatorBoard[jumpRow][jumpCol] === 0) {
                     
-                    // Разрешаем взятие даже в желтую зону
+                    // Разрешаем взятие даже в желтую/красную зону
                     moves.push({
                         row: jumpRow,
                         col: jumpCol,
@@ -1719,6 +1725,7 @@
                 }
             }
             
+            // Если есть взятия, возвращаем только их
             if (hasCaptures) return moves;
             
             // Обычные ходы только по диагонали
@@ -1802,8 +1809,9 @@
                     availableMoves = nextCaptures;
                     updateBoardUI();
                     highlightAvailableMoves();
+                    hasContinuingCapture = true;
                     showNotification('⚔️ Продолжайте взятие!');
-                    return true;
+                    return true; // Возвращаем true, но НЕ передаем ход ботам
                 }
             }
             
@@ -1825,6 +1833,7 @@
                 gladiatorTurn = 1;
             }
             
+            hasContinuingCapture = false;
             updateGladiatorUI();
             checkGladiatorGameEnd();
             return true;
@@ -1833,6 +1842,12 @@
         function makeGladiatorBotMoves() {
             if (!playerAlive || botsAlive === 0) {
                 checkGladiatorGameEnd();
+                return;
+            }
+            
+            // Если у игрока есть продолжение взятия, боты не ходят
+            if (hasContinuingCapture) {
+                showNotification('⚔️ Завершите взятие!');
                 return;
             }
             
@@ -1995,6 +2010,7 @@
             initGladiatorBoard();
             gameActive = true;
             isPlayerTurn = true;
+            hasContinuingCapture = false;
             updatePlayerCards();
             showNotification('⚔️ Гладиаторская битва началась! Ваш ход.');
         }
@@ -2101,6 +2117,26 @@
         }
         
         function handleGladiatorCellClick(row, col) {
+            // Если у игрока есть продолжение взятия, он должен завершить его
+            if (hasContinuingCapture) {
+                // Проверяем, нажимает ли игрок на допустимый ход для продолжения взятия
+                if (selectedChecker && isAvailableMove(row, col)) {
+                    if (makeGladiatorMove(row, col)) {
+                        // Если после хода больше нет продолжения взятия, передаем ход ботам
+                        if (!hasContinuingCapture && playerAlive && botsAlive > 0) {
+                            isPlayerTurn = false;
+                            setTimeout(() => {
+                                makeGladiatorBotMoves();
+                            }, 1000);
+                        }
+                    }
+                } else if (gladiatorBoard[row][col] === 1) {
+                    // Игрок пытается выбрать другую шашку во время продолжения взятия
+                    showNotification('⚠️ Завершите взятие текущей шашкой!');
+                }
+                return;
+            }
+            
             if (!playerAlive || !isPlayerTurn) return;
             
             const piece = gladiatorBoard[row][col];
@@ -2132,8 +2168,8 @@
             }
             else if (selectedChecker && isAvailableMove(row, col)) {
                 if (makeGladiatorMove(row, col)) {
-                    // После хода игрока передаем ход ботам
-                    if (playerAlive && botsAlive > 0) {
+                    // После хода игрока передаем ход ботам, если нет продолжения взятия
+                    if (!hasContinuingCapture && playerAlive && botsAlive > 0) {
                         isPlayerTurn = false;
                         setTimeout(() => {
                             makeGladiatorBotMoves();
@@ -2536,7 +2572,7 @@
             if (gladiatorMode) {
                 if (isPlayerTurn && playerAlive) {
                     player1Card.classList.add('active');
-                    document.getElementById('game-status').textContent = 'Ваш ход';
+                    document.getElementById('game-status').textContent = hasContinuingCapture ? 'Продолжайте взятие!' : 'Ваш ход';
                 } else {
                     player2Card.classList.add('active');
                     document.getElementById('game-status').textContent = 'Ход ботов...';
@@ -2916,9 +2952,9 @@
                 - Побеждает тот, кто первым остался без шашек
                 
                 Режим "Гладиатор":
-                - 1 игрок против 6 ботов на границах доски
-                - Все шашки спавнятся на черных клетках границ (ряды 0 и 7, колонки 0 и 7)
-                - Между всеми шашками расстояние минимум 1 черная клетка
+                - 1 игрок против 6 ботов на всей доске
+                - Все шашки спавнятся на черных клетках
+                - Между всеми шашками расстояние минимум 1 клетка
                 - Все ходят только по диагонали (как обычные шашки)
                 - Каждые 2 хода красная зона расширяется от границ к центру
                 - За 1 ход до расширения зона становится желтой (предупреждение)
