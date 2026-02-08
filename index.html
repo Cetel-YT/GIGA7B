@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Онлайн шашки</title>
+    <title>Онлайн шашки D</title>
     
     <!-- Firebase SDK -->
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
@@ -1062,7 +1062,6 @@
                     <div id="moves-history" style="height: 200px; overflow-y: auto;">
                         <!-- История ходов будет здесь -->
                     </div>
-                </div>
             </div>
         </div>
     </div>
@@ -1112,7 +1111,6 @@
         let botsAlive = 6;
         let gladiatorBoard = [];
         let isPlayerTurn = true;
-        let hasMadeCapture = false;
         
         // Администраторы
         const ADMIN_USERS = ['admin', 'administrator', 'супервайзер'];
@@ -1493,105 +1491,84 @@
         function initGladiatorBoard() {
             gladiatorBoard = Array(8).fill().map(() => Array(8).fill(0));
             
-            // Фиксированные позиции на границе карты с расстоянием в 1 клетку
-            // Позиции на темных клетках (где могут стоять шашки)
-            const fixedPositions = [
-                // A1, C1, E1, G1 (верхний ряд)
-                {row: 0, col: 1}, // A1
-                {row: 0, col: 3}, // C1
-                {row: 0, col: 5}, // E1
-                {row: 0, col: 7}, // G1
-                
-                // H2, H4, H6, H8 (правый ряд)
-                {row: 7, col: 0}, // H2
-                {row: 7, col: 2}, // H4
-                {row: 7, col: 4}, // H6
-                {row: 7, col: 6}, // H8
-                
-                // B8, D8, F8, H8 (нижний ряд - некоторые дублируют правый ряд)
-                {row: 7, col: 1}, // B8
-                {row: 7, col: 3}, // D8
-                {row: 7, col: 5}, // F8
-                
-                // A3, A5, A7 (левый ряд)
-                {row: 0, col: 2}, // A3
-                {row: 0, col: 4}, // A5
-                {row: 0, col: 6}, // A7
-                
-                // Дополнительные позиции для разнообразия
-                {row: 1, col: 0}, // B1
-                {row: 1, col: 2}, // B3
-                {row: 6, col: 1}, // G2
-                {row: 6, col: 3}, // G4
-            ];
+            // ЧЕРНЫЕ клетки на границах доски (ряды 0 и 7, колонки 0 и 7)
+            // Только черные клетки: (row + col) % 2 === 1
+            const borderCells = [];
             
-            // Перемешиваем позиции
-            const shuffledPositions = [...fixedPositions].sort(() => Math.random() - 0.5);
+            // Верхняя граница (ряд 0)
+            for (let col = 0; col < 8; col++) {
+                if ((0 + col) % 2 === 1) { // Черная клетка
+                    borderCells.push({row: 0, col: col});
+                }
+            }
             
-            // Игрок на случайной позиции из первых 4
-            const playerPosIndex = Math.floor(Math.random() * 4);
-            const playerPos = shuffledPositions[playerPosIndex];
+            // Нижняя граница (ряд 7)
+            for (let col = 0; col < 8; col++) {
+                if ((7 + col) % 2 === 1) { // Черная клетка
+                    borderCells.push({row: 7, col: col});
+                }
+            }
+            
+            // Левая граница (колонка 0) - кроме углов
+            for (let row = 1; row < 7; row++) {
+                if ((row + 0) % 2 === 1) { // Черная клетка
+                    borderCells.push({row: row, col: 0});
+                }
+            }
+            
+            // Правая граница (колонка 7) - кроме углов
+            for (let row = 1; row < 7; row++) {
+                if ((row + 7) % 2 === 1) { // Черная клетка
+                    borderCells.push({row: row, col: 7});
+                }
+            }
+            
+            // Перемешиваем клетки
+            const shuffledCells = [...borderCells].sort(() => Math.random() - 0.5);
+            
+            // Размещаем игрока
+            const playerPos = shuffledCells[0];
             gladiatorBoard[playerPos.row][playerPos.col] = 1;
             
-            // Убираем использованную позицию
-            shuffledPositions.splice(playerPosIndex, 1);
+            // Размещаем ботов с расстоянием минимум 1 черная клетка
+            let placedBots = 0;
+            let index = 1;
             
-            // Боты на оставшихся позициях (первые 6)
-            for (let i = 0; i < Math.min(6, shuffledPositions.length); i++) {
-                const pos = shuffledPositions[i];
-                gladiatorBoard[pos.row][pos.col] = 2;
-            }
-            
-            // Если не хватило позиций для ботов, добавляем дополнительные
-            let botCount = 0;
-            for (let row = 0; row < 8; row++) {
-                for (let col = 0; col < 8; col++) {
-                    if (gladiatorBoard[row][col] === 2) botCount++;
-                }
-            }
-            
-            // Добиваем до 6 ботов
-            while (botCount < 6) {
-                let placed = false;
-                for (let row = 0; row < 8 && !placed; row++) {
-                    for (let col = 0; col < 8 && !placed; col++) {
-                        if ((row + col) % 2 === 1 && gladiatorBoard[row][col] === 0) {
-                            // Проверяем расстояние до других фигур
-                            let tooClose = false;
-                            for (let r = 0; r < 8; r++) {
-                                for (let c = 0; c < 8; c++) {
-                                    if (gladiatorBoard[r][c] !== 0) {
-                                        const distance = Math.abs(r - row) + Math.abs(c - col);
-                                        if (distance <= 1) {
-                                            tooClose = true;
-                                            break;
-                                        }
-                                    }
-                                }
-                                if (tooClose) break;
-                            }
-                            
-                            if (!tooClose) {
-                                gladiatorBoard[row][col] = 2;
-                                botCount++;
-                                placed = true;
+            while (placedBots < 6 && index < shuffledCells.length) {
+                const pos = shuffledCells[index];
+                let canPlace = true;
+                
+                // Проверяем расстояние до всех уже размещенных шашек
+                for (let row = 0; row < 8; row++) {
+                    for (let col = 0; col < 8; col++) {
+                        if (gladiatorBoard[row][col] !== 0) {
+                            // Расстояние Манхэттена должно быть > 1
+                            const distance = Math.abs(row - pos.row) + Math.abs(col - pos.col);
+                            if (distance <= 1) {
+                                canPlace = false;
+                                break;
                             }
                         }
                     }
+                    if (!canPlace) break;
                 }
                 
-                // Если не удалось разместить с расстоянием, размещаем в любом месте
-                if (!placed) {
-                    for (let row = 0; row < 8 && !placed; row++) {
-                        for (let col = 0; col < 8 && !placed; col++) {
-                            if ((row + col) % 2 === 1 && gladiatorBoard[row][col] === 0) {
-                                gladiatorBoard[row][col] = 2;
-                                botCount++;
-                                placed = true;
-                            }
-                        }
-                    }
+                if (canPlace) {
+                    gladiatorBoard[pos.row][pos.col] = 2;
+                    placedBots++;
                 }
+                
+                index++;
+            }
+            
+            // Если не удалось разместить всех ботов с расстоянием, размещаем в оставшиеся клетки
+            while (placedBots < 6 && index < shuffledCells.length) {
+                const pos = shuffledCells[index];
+                if (gladiatorBoard[pos.row][pos.col] === 0) {
+                    gladiatorBoard[pos.row][pos.col] = 2;
+                    placedBots++;
+                }
+                index++;
             }
             
             dangerZoneLevel = 0;
@@ -1601,7 +1578,6 @@
             playerAlive = true;
             botsAlive = 6;
             isPlayerTurn = true;
-            hasMadeCapture = false;
             
             updateGladiatorUI();
             boardState = gladiatorBoard;
@@ -1730,7 +1706,7 @@
                     gladiatorBoard[captureRow][captureCol] === enemy &&
                     gladiatorBoard[jumpRow][jumpCol] === 0) {
                     
-                    // Разрешаем взятие даже в желтую зону (исправление бага #3)
+                    // Разрешаем взятие даже в желтую зону
                     moves.push({
                         row: jumpRow,
                         col: jumpCol,
@@ -1745,7 +1721,7 @@
             
             if (hasCaptures) return moves;
             
-            // Обычные ходы
+            // Обычные ходы только по диагонали
             for (const dir of directions) {
                 const newRow = row + dir.dr;
                 const newCol = col + dir.dc;
@@ -1817,9 +1793,7 @@
                     botsAlive--;
                 }
                 
-                hasMadeCapture = true;
-                
-                // Проверяем возможность продолжения взятия (исправление бага #2)
+                // Проверяем возможность продолжения взятия
                 const nextCaptures = getGladiatorAvailableMoves(toRow, toCol, player)
                     .filter(m => m.isCapture);
                 
@@ -1836,9 +1810,6 @@
             boardState = gladiatorBoard;
             updateBoardUI();
             clearSelection();
-            
-            // Сбрасываем флаг взятия если ход завершен
-            hasMadeCapture = false;
             
             dangerZoneTimer--;
             if (dangerZoneTimer <= 0) {
@@ -1884,7 +1855,7 @@
                 }
             }
             
-            // Если ни один бот не может ходить, просто переходим к следующему ходу
+            // Если ни один бот не может ходить, пропускаем ход
             if (!anyBotCanMove) {
                 isPlayerTurn = true;
                 updateGladiatorUI();
@@ -1895,59 +1866,44 @@
             
             bots.sort(() => Math.random() - 0.5);
             let botIndex = 0;
-            let processedBots = 0;
             
             function makeNextBotMove() {
-                // Пропускаем ботов, которые не могут ходить (исправление бага #4)
-                while (botIndex < bots.length) {
-                    const bot = bots[botIndex];
-                    const moves = getGladiatorAvailableMoves(bot.row, bot.col, 2);
-                    
-                    if (moves.length > 0) {
-                        const bestMove = selectBestBotMove(moves, bot.row, bot.col);
-                        
-                        if (bestMove) {
-                            gladiatorBoard[bot.row][bot.col] = 0;
-                            gladiatorBoard[bestMove.row][bestMove.col] = 2;
-                            
-                            if (bestMove.isCapture) {
-                                const captured = gladiatorBoard[bestMove.captureRow][bestMove.captureCol];
-                                gladiatorBoard[bestMove.captureRow][bestMove.captureCol] = 0;
-                                
-                                if (captured === 1) {
-                                    playerAlive = false;
-                                } else if (captured === 2) {
-                                    botsAlive--;
-                                }
-                            }
-                            
-                            boardState = gladiatorBoard;
-                            updateBoardUI();
-                        }
-                    }
-                    
-                    botIndex++;
-                    processedBots++;
-                    
-                    // Если обработали всех ботов или игрок умер
-                    if (botIndex >= bots.length || !playerAlive) {
-                        isPlayerTurn = true;
-                        updateGladiatorUI();
-                        updateDangerZoneDisplay();
-                        checkGladiatorGameEnd();
-                        return;
-                    }
-                    
-                    // Делаем небольшую паузу между ходами ботов
-                    setTimeout(makeNextBotMove, 300);
+                if (botIndex >= bots.length || !playerAlive || botsAlive === 0) {
+                    isPlayerTurn = true;
+                    updateGladiatorUI();
+                    updateDangerZoneDisplay();
+                    checkGladiatorGameEnd();
                     return;
                 }
                 
-                // Если дошли сюда, значит все боты не могут ходить
-                isPlayerTurn = true;
-                updateGladiatorUI();
-                updateDangerZoneDisplay();
-                checkGladiatorGameEnd();
+                const bot = bots[botIndex];
+                const moves = getGladiatorAvailableMoves(bot.row, bot.col, 2);
+                
+                if (moves.length > 0) {
+                    const bestMove = selectBestBotMove(moves, bot.row, bot.col);
+                    
+                    if (bestMove) {
+                        gladiatorBoard[bot.row][bot.col] = 0;
+                        gladiatorBoard[bestMove.row][bestMove.col] = 2;
+                        
+                        if (bestMove.isCapture) {
+                            const captured = gladiatorBoard[bestMove.captureRow][bestMove.captureCol];
+                            gladiatorBoard[bestMove.captureRow][bestMove.captureCol] = 0;
+                            
+                            if (captured === 1) {
+                                playerAlive = false;
+                            } else if (captured === 2) {
+                                botsAlive--;
+                            }
+                        }
+                        
+                        boardState = gladiatorBoard;
+                        updateBoardUI();
+                    }
+                }
+                
+                botIndex++;
+                setTimeout(makeNextBotMove, 300);
             }
             
             makeNextBotMove();
@@ -2088,7 +2044,7 @@
                     });
                     
                     const piece = boardState[row][col];
-                    if (piece !== 0) {
+                    if (piece !== 0 && (row + col) % 2 === 1) { // Только на черных клетках
                         const checker = document.createElement('div');
                         let checkerClass = 'checker ';
                         if (gladiatorMode) {
@@ -2113,17 +2069,19 @@
         function getInitialBoard() {
             const board = Array(8).fill().map(() => Array(8).fill(0));
             
+            // Игрок (нижняя часть) - только на черных клетках
             for (let row = 5; row < 8; row++) {
                 for (let col = 0; col < 8; col++) {
-                    if ((row + col) % 2 === 1) {
+                    if ((row + col) % 2 === 1) { // Только черные клетки
                         board[row][col] = 1;
                     }
                 }
             }
             
+            // Бот (верхняя часть) - только на черных клетках
             for (let row = 0; row < 3; row++) {
                 for (let col = 0; col < 8; col++) {
-                    if ((row + col) % 2 === 1) {
+                    if ((row + col) % 2 === 1) { // Только черные клетки
                         board[row][col] = 2;
                     }
                 }
@@ -2174,8 +2132,8 @@
             }
             else if (selectedChecker && isAvailableMove(row, col)) {
                 if (makeGladiatorMove(row, col)) {
-                    // Если было взятие и можно продолжать, остаемся на ходу игрока
-                    if (!hasMadeCapture) {
+                    // После хода игрока передаем ход ботам
+                    if (playerAlive && botsAlive > 0) {
                         isPlayerTurn = false;
                         setTimeout(() => {
                             makeGladiatorBotMoves();
@@ -2505,7 +2463,7 @@
                 const oldChecker = cell.querySelector('.checker');
                 if (oldChecker) oldChecker.remove();
                 
-                if (piece !== 0) {
+                if (piece !== 0 && (row + col) % 2 === 1) { // Только на черных клетках
                     const checker = document.createElement('div');
                     if (gladiatorMode) {
                         checker.className = `checker ${piece === 1 ? 'player1' : 'gladiator-bot'}`;
@@ -2663,7 +2621,7 @@
                 }
             }
             
-            // Если у бота нет ходов, пропускаем ход (исправление бага #4)
+            // Если у бота нет ходов, пропускаем ход
             if (allMoves.length === 0) {
                 botThinking = false;
                 currentPlayer = 1;
@@ -2951,6 +2909,7 @@
                 5. Дамка может бить на любое расстояние
                 6. При достижении последней горизонтали шашка становится дамкой
                 7. При взятии можно продолжать бить дальше
+                8. Шашки стоят только на черных клетках!
                 
                 Режим "Поддавки":
                 - Цель игры - избавиться от ВСЕХ своих шашек ПЕРВЫМ
@@ -2958,8 +2917,9 @@
                 
                 Режим "Гладиатор":
                 - 1 игрок против 6 ботов на границах доски
-                - Фиксированные позиции: A1, C1, E1, G1, H2, H4, H6, H8 и другие
-                - Все ходят в любом направлении, дамок нет
+                - Все шашки спавнятся на черных клетках границ (ряды 0 и 7, колонки 0 и 7)
+                - Между всеми шашками расстояние минимум 1 черная клетка
+                - Все ходят только по диагонали (как обычные шашки)
                 - Каждые 2 хода красная зона расширяется от границ к центру
                 - За 1 ход до расширения зона становится желтой (предупреждение)
                 - В красную и желтую зоны нельзя заходить (НО можно бить через них!)
