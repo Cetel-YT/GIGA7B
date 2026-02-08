@@ -147,12 +147,12 @@ async function register() {
         const userData = {
             username: username,
             email: email,
-            rating: 1000,
+            rating: 0,
             wins: 0,
             losses: 0,
             draws: 0,
             calibrationGames: 0,
-            calibrationCompleted: true,
+            calibrationCompleted: false,
             ratingHistory: [],
             isAdmin: isAdmin,
             createdAt: firebase.database.ServerValue.TIMESTAMP,
@@ -260,73 +260,11 @@ async function logout() {
 }
 
 // ====================================================
-// АДМИН-ФУНКЦИИ И ЛИДЕРБОРД
+// АДМИН-ФУНКЦИИ
 // ====================================================
 function toggleAdminPanel() {
     const panel = document.getElementById('admin-panel');
     panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
-}
-
-function toggleLeaderboard() {
-    const panel = document.getElementById('leaderboard-panel');
-    if (panel.style.display === 'none') {
-        panel.style.display = 'block';
-        updateLeaderboard();
-    } else {
-        panel.style.display = 'none';
-    }
-}
-
-async function updateLeaderboard() {
-    try {
-        const snapshot = await database.ref('users').once('value');
-        const users = snapshot.val();
-        const leaderboard = [];
-        
-        for (const uid in users) {
-            const user = users[uid];
-            if (user.username && user.rating !== undefined && user.calibrationCompleted) {
-                leaderboard.push({
-                    username: user.username,
-                    rating: user.rating || 1000,
-                    wins: user.wins || 0,
-                    losses: user.losses || 0,
-                    draws: user.draws || 0
-                });
-            }
-        }
-        
-        leaderboard.sort((a, b) => b.rating - a.rating);
-        
-        const leaderboardContent = document.getElementById('leaderboard-content');
-        leaderboardContent.innerHTML = '';
-        
-        if (leaderboard.length === 0) {
-            leaderboardContent.innerHTML = '<p style="text-align: center; color: #aaa;">Нет данных о рейтинге</p>';
-            return;
-        }
-        
-        leaderboard.slice(0, 20).forEach((user, index) => {
-            const row = document.createElement('div');
-            row.className = 'leaderboard-row';
-            let medal = '';
-            if (index === 0) medal = '🥇';
-            else if (index === 1) medal = '🥈';
-            else if (index === 2) medal = '🥉';
-            
-            row.innerHTML = `
-                <div class="leaderboard-rank">${index + 1} ${medal}</div>
-                <div class="leaderboard-name">${user.username}</div>
-                <div class="leaderboard-rating">${user.rating}</div>
-            `;
-            leaderboardContent.appendChild(row);
-        });
-        
-    } catch (error) {
-        console.error('❌ Ошибка загрузки лидерборда:', error);
-        document.getElementById('leaderboard-content').innerHTML = 
-            '<p style="color: #ff6b6b; text-align: center;">Ошибка загрузки лидерборда</p>';
-    }
 }
 
 async function clearChat() {
@@ -398,25 +336,22 @@ async function resetAllUsersRating() {
             const updates = {};
             
             Object.keys(users || {}).forEach(uid => {
-                updates[`${uid}/rating`] = 1000;
+                updates[`${uid}/rating`] = 0;
                 updates[`${uid}/calibrationGames`] = 0;
-                updates[`${uid}/calibrationCompleted`] = true;
+                updates[`${uid}/calibrationCompleted`] = false;
                 updates[`${uid}/ratingHistory`] = [];
                 updates[`${uid}/lastRatingReset`] = firebase.database.ServerValue.TIMESTAMP;
             });
             
             await database.ref('users').update(updates);
-            showNotification('✅ Рейтинг всех пользователей сброшен к 1000!');
+            showNotification('✅ Рейтинг всех пользователей сброшен!');
             
-            if (currentUser) {
-                currentUser.rating = 1000;
+            if (currentUser && !currentUser.isAdmin) {
+                currentUser.rating = 0;
                 currentUser.calibrationGames = 0;
-                currentUser.calibrationCompleted = true;
+                currentUser.calibrationCompleted = false;
                 updateUserUI();
             }
-            
-            // Обновляем лидерборд
-            updateLeaderboard();
             
         } catch (error) {
             console.error('❌ Ошибка сброса рейтинга:', error);
@@ -477,7 +412,6 @@ function setGameMode(mode) {
         document.getElementById('gladiator-info').style.display = 'none';
         document.getElementById('gladiator-stats').style.display = 'none';
         document.getElementById('buffs-panel').style.display = 'none';
-        document.getElementById('leaderboard-panel').style.display = 'none';
         showNotification('🏆 Рейтинговая игра! Сложность: эксперт');
     } else if (mode === 'gladiator') {
         document.getElementById('bot-controls').style.display = 'none';
@@ -485,7 +419,6 @@ function setGameMode(mode) {
         document.getElementById('gladiator-info').style.display = 'block';
         document.getElementById('gladiator-stats').style.display = 'block';
         document.getElementById('buffs-panel').style.display = 'block';
-        document.getElementById('leaderboard-panel').style.display = 'none';
         
         document.getElementById('player2-name').textContent = '23 бота';
         document.getElementById('player2-rating').textContent = 'Королевская битва';
@@ -496,7 +429,6 @@ function setGameMode(mode) {
         document.getElementById('gladiator-info').style.display = 'none';
         document.getElementById('gladiator-stats').style.display = 'none';
         document.getElementById('buffs-panel').style.display = 'none';
-        document.getElementById('leaderboard-panel').style.display = 'none';
         document.getElementById('player2-name').textContent = 'Бот';
         updateBotLevel();
     }
@@ -843,8 +775,11 @@ function updateGladiatorUI() {
         warningInfo.style.display = 'none';
     }
     
-    // ТЕПЕРЬ СНАБЖЕНИЕ ПОЯВЛЯЕТСЯ ТОЛЬКО КАЖДЫЕ 3 ХОДА
-    // (логика перенесена в makeGladiatorMove)
+    supplySpawnCounter++;
+    if (supplySpawnCounter >= 3) {
+        spawnPurpleSupply();
+        supplySpawnCounter = 0;
+    }
 }
 
 function updateDangerZoneDisplay() {
@@ -1146,16 +1081,6 @@ function makeGladiatorMove(toRow, toCol) {
     }
     
     hasContinuingCapture = false;
-    
-    // ТЕПЕРЬ СНАБЖЕНИЕ ПОЯВЛЯЕТСЯ КАЖДЫЕ 3 ХОДА ИГРОКА
-    if (player === 1) {
-        supplySpawnCounter++;
-        if (supplySpawnCounter >= 3) {
-            spawnPurpleSupply();
-            supplySpawnCounter = 0;
-        }
-    }
-    
     updateGladiatorUI();
     checkGladiatorGameEnd();
     return true;
@@ -1249,51 +1174,6 @@ function makeGladiatorBotMoves() {
                         if (botBuffs[capturedKey]) delete botBuffs[capturedKey];
                         
                         awardTrophy(2, bestMove.row, bestMove.col);
-                    }
-                    
-                    // БОТ МОЖЕТ ПРОДОЛЖИТЬ ВЗЯТИЕ!
-                    const nextCaptures = getGladiatorAvailableMoves(bestMove.row, bestMove.col, 2)
-                        .filter(m => m.isCapture);
-                    
-                    if (nextCaptures.length > 0) {
-                        // Бот продолжает взятие немедленно
-                        const nextMove = selectBestBotMove(nextCaptures, bestMove.row, bestMove.col, newKey);
-                        if (nextMove) {
-                            setTimeout(() => {
-                                // Имитируем еще один ход бота с взятием
-                                gladiatorBoard[bestMove.row][bestMove.col] = 0;
-                                gladiatorBoard[nextMove.row][nextMove.col] = 2;
-                                
-                                const nextKey = `${nextMove.row}-${nextMove.col}`;
-                                if (botBuffs[newKey]) {
-                                    botBuffs[nextKey] = { ...botBuffs[newKey] };
-                                    delete botBuffs[newKey];
-                                }
-                                
-                                const captured2 = gladiatorBoard[nextMove.captureRow][nextMove.captureCol];
-                                gladiatorBoard[nextMove.captureRow][nextMove.captureCol] = 0;
-                                
-                                if (captured2 === 1) {
-                                    playerAlive = false;
-                                    showNotification('⚔️ Ваша шашка была взята ботом повторно!', 'error');
-                                } else if (captured2 === 2) {
-                                    if (botsAlive > 0) botsAlive--;
-                                    const capturedKey2 = `${nextMove.captureRow}-${nextMove.captureCol}`;
-                                    if (botBuffs[capturedKey2]) delete botBuffs[capturedKey2];
-                                    
-                                    awardTrophy(2, nextMove.row, nextMove.col);
-                                }
-                                
-                                boardState = gladiatorBoard;
-                                updateBoardUI();
-                                movesMade++;
-                                botIndex++;
-                                setTimeout(() => {
-                                    makeNextBotMove();
-                                }, 200);
-                            }, 200);
-                            return;
-                        }
                     }
                 }
                 
@@ -2282,152 +2162,40 @@ function makeBotMove() {
 }
 
 function getBestContinueMove(moves, difficulty) {
-    // Для продолжения взятия выбираем лучший ход
-    // Бот должен брать максимальное количество шашек
-    
-    if (moves.length === 0) return null;
-    
     let bestMove = moves[0];
-    let maxChainLength = 0;
+    let bestScore = -Infinity;
     
-    // Проверяем, какой ход ведет к самой длинной цепочке взятий
-    for (const move of moves) {
-        // Создаем временную доску для симуляции
+    moves.forEach(move => {
+        let score = 0;
+        
+        // Базовый счет за взятие
+        score += 20;
+        
+        // Учитываем ценность захваченной шашки
+        const capturedPiece = boardState[move.captureRow][move.captureCol];
+        if (capturedPiece === 3 || capturedPiece === 4) score += 15;
+        
+        // Проверяем, ведет ли ход к дальнейшим взятиям
         const tempBoard = JSON.parse(JSON.stringify(boardState));
-        const tempSelectedChecker = { row: selectedChecker.row, col: selectedChecker.col };
+        tempBoard[move.row][move.col] = tempBoard[selectedChecker.row][selectedChecker.col];
+        tempBoard[selectedChecker.row][selectedChecker.col] = 0;
+        tempBoard[move.captureRow][move.captureCol] = 0;
         
-        // Выполняем текущий ход
-        tempBoard[tempSelectedChecker.row][tempSelectedChecker.col] = 0;
-        tempBoard[move.row][move.col] = boardState[tempSelectedChecker.row][tempSelectedChecker.col];
-        if (move.isCapture) {
-            tempBoard[move.captureRow][move.captureCol] = 0;
+        const nextCaptures = getCapturesForChecker(move.row, move.col);
+        if (nextCaptures.length > 0) {
+            score += 25;
         }
         
-        // Рекурсивно ищем дальнейшие взятия
-        function findCaptureChain(row, col, depth) {
-            const captures = getCapturesForCheckerFromBoard(tempBoard, row, col, boardState[row][col]);
-            if (captures.length === 0) return depth;
-            
-            let maxDepth = depth;
-            for (const capture of captures) {
-                // Сохраняем состояние
-                const savedBoard = JSON.parse(JSON.stringify(tempBoard));
-                
-                // Выполняем взятие
-                tempBoard[row][col] = 0;
-                tempBoard[capture.row][capture.col] = savedBoard[row][col];
-                tempBoard[capture.captureRow][capture.captureCol] = 0;
-                
-                // Рекурсивно продолжаем
-                const chainDepth = findCaptureChain(capture.row, capture.col, depth + 1);
-                maxDepth = Math.max(maxDepth, chainDepth);
-                
-                // Восстанавливаем состояние для проверки следующего варианта
-                for (let r = 0; r < currentBoardSize; r++) {
-                    for (let c = 0; c < currentBoardSize; c++) {
-                        tempBoard[r][c] = savedBoard[r][c];
-                    }
-                }
-            }
-            return maxDepth;
-        }
+        // Избегаем опасных позиций
+        if (isVulnerable(move.row, move.col, 2)) score -= 15;
         
-        const chainLength = findCaptureChain(move.row, move.col, 1);
-        
-        if (chainLength > maxChainLength) {
-            maxChainLength = chainLength;
+        if (score > bestScore) {
+            bestScore = score;
             bestMove = move;
         }
-    }
+    });
     
     return bestMove;
-}
-
-function getCapturesForCheckerFromBoard(board, row, col, piece) {
-    const captures = [];
-    if (piece === 0) return captures;
-    
-    const isKing = piece > 2;
-    const player = piece === 1 || piece === 3 ? 1 : 2;
-    const enemyPieces = player === 1 ? [2, 4] : [1, 3];
-    
-    if (isKing) {
-        const directions = [
-            { dr: -1, dc: -1 },
-            { dr: -1, dc: 1 },
-            { dr: 1, dc: -1 },
-            { dr: 1, dc: 1 }
-        ];
-        
-        for (const dir of directions) {
-            let currentRow = row + dir.dr;
-            let currentCol = col + dir.dc;
-            let foundEnemy = false;
-            let enemyRow = -1;
-            let enemyCol = -1;
-            
-            while (isValidPosition(currentRow, currentCol)) {
-                if (board[currentRow][currentCol] === 0) {
-                    if (foundEnemy) {
-                        captures.push({
-                            row: currentRow,
-                            col: currentCol,
-                            isCapture: true,
-                            captureRow: enemyRow,
-                            captureCol: enemyCol,
-                            isKingCapture: true,
-                            direction: dir
-                        });
-                    }
-                } else if (enemyPieces.includes(board[currentRow][currentCol])) {
-                    if (!foundEnemy) {
-                        foundEnemy = true;
-                        enemyRow = currentRow;
-                        enemyCol = currentCol;
-                    } else {
-                        break;
-                    }
-                } else {
-                    break;
-                }
-                currentRow += dir.dr;
-                currentCol += dir.dc;
-            }
-        }
-    } else {
-        const directions = [
-            { dr: -1, dc: -1 },
-            { dr: -1, dc: 1 },
-            { dr: 1, dc: -1 },
-            { dr: 1, dc: 1 }
-        ];
-        
-        for (const dir of directions) {
-            const jumpRow = row + dir.dr * 2;
-            const jumpCol = col + dir.dc * 2;
-            const middleRow = row + dir.dr;
-            const middleCol = col + dir.dc;
-            
-            if (isValidPosition(jumpRow, jumpCol) && 
-                board[jumpRow][jumpCol] === 0 &&
-                isValidPosition(middleRow, middleCol)) {
-                
-                const middlePiece = board[middleRow][middleCol];
-                if (enemyPieces.includes(middlePiece)) {
-                    captures.push({ 
-                        row: jumpRow, 
-                        col: jumpCol, 
-                        isCapture: true,
-                        captureRow: middleRow,
-                        captureCol: middleCol,
-                        direction: dir
-                    });
-                }
-            }
-        }
-    }
-    
-    return captures;
 }
 
 function getEasyMove(moves) {
@@ -2641,10 +2409,10 @@ function endGame(result, manualEnd = false) {
     
     if (gameMode === 'giveaway') {
         if (result === 1) {
-            message = '🎉 Вы отдали все шашки первым! Победа в поддавки!';
+            message = '🎉 Вы отдали все шашки первым! Победа в поддавках!';
             gameResult = 'win';
         } else {
-            message = '😞 Бот отдал все шашки первым! Вы проиграли в поддавки.';
+            message = '😞 Бот отдал все шашки первым! Вы проиграли в поддавках.';
             gameResult = 'loss';
         }
     } else if (gameMode === 'rating') {
@@ -2714,7 +2482,7 @@ function showRules() {
            - Можно копить несколько штук
            - Подбирается при заходе на клетку
         
-        2. 💜 Фиолетовое снабжение (появляется каждые 3 хода игрока):
+        2. 💜 Фиолетовое снабжение (появляется раз в 3 хода):
            - Дает возможность сделать два хода подряд
            - Не копится (можно иметь только одно)
            - Автоматически используется при получении
@@ -2729,17 +2497,13 @@ function showRules() {
         - Стремятся к зеленым и фиолетовым баффам
         - Используют трофеи для защиты от красной зоны
         - Могут пропустить взятие, если есть зеленый припас
-        - Могут продолжать взятие несколько раз подряд
         
         Рейтинговая система:
-        - Начальный рейтинг: 1000
+        - Первые 3 игры - калибровочные
+        - После калибровки рейтинг от 1000 до 4000
         - Рейтинг меняется ТОЛЬКО в рейтинговом режиме
         - В рейтинговом режиме всегда игра против эксперта
-        - При смене режима или начале новой игры до окончания партии засчитается поражение
-        
-        🏆 Лидерборд:
-        - Отображает топ-20 игроков по рейтингу
-        - Обновляется автоматически
+        - При смене режима или начале новой игры до окончания партии засчитывается поражение
         
         Удачи в игре! 🎮
     `;
@@ -2885,9 +2649,9 @@ async function updateRating(gameResult) {
         const snapshot = await userRef.once('value');
         const userData = snapshot.val() || {};
         
-        let userRating = userData.rating || 1000;
+        let userRating = userData.rating || 0;
         let userCalibrationGames = userData.calibrationGames || 0;
-        let userCalibrationCompleted = userData.calibrationCompleted || true;
+        let userCalibrationCompleted = userData.calibrationCompleted || false;
         let userRatingHistory = userData.ratingHistory || [];
         let userLastRatingReset = userData.lastRatingReset || null;
         
@@ -2898,13 +2662,36 @@ async function updateRating(gameResult) {
         let newRating;
         let ratingChange;
         
-        // Все пользователи теперь начинают с рейтинга 1000 и калибровка завершена
-        const expectedScore = 1 / (1 + Math.pow(10, (2000 - userRating) / 400));
-        const kFactor = calculateKFactor(userRating);
-        ratingChange = Math.round(kFactor * (result - expectedScore));
-        newRating = userRating + ratingChange;
-        if (newRating < 1000) newRating = 1000;
-        if (newRating > 4000) newRating = 4000;
+        if (!userCalibrationCompleted && userCalibrationGames < 3) {
+            userCalibrationGames++;
+            
+            if (result === 1) {
+                ratingChange = 1000;
+                newRating = 2500 + (Math.random() * 1000);
+            } else if (result === 0.5) {
+                ratingChange = 500;
+                newRating = 1500 + (Math.random() * 1000);
+            } else {
+                ratingChange = 0;
+                newRating = 1000 + (Math.random() * 500);
+            }
+            
+            newRating = Math.round(newRating);
+            
+            if (userCalibrationGames >= 3) {
+                userCalibrationCompleted = true;
+                if (newRating < 1000) newRating = 1000;
+                if (newRating > 4000) newRating = 4000;
+                showNotification(`🎯 Калибровка завершена! Ваш рейтинг: ${newRating}`);
+            }
+        } else {
+            const expectedScore = 1 / (1 + Math.pow(10, (2000 - userRating) / 400));
+            const kFactor = calculateKFactor(userRating);
+            ratingChange = Math.round(kFactor * (result - expectedScore));
+            newRating = userRating + ratingChange;
+            if (newRating < 1000) newRating = 1000;
+            if (newRating > 4000) newRating = 4000;
+        }
         
         userRatingHistory.push({
             rating: Math.round(newRating),
@@ -2918,10 +2705,15 @@ async function updateRating(gameResult) {
         
         await userRef.update({
             rating: Math.round(newRating),
-            ratingHistory: userRatingHistory
+            calibrationGames: userCalibrationGames,
+            calibrationCompleted: userCalibrationCompleted,
+            ratingHistory: userRatingHistory,
+            lastRatingReset: userLastRatingReset
         });
         
         currentUser.rating = Math.round(newRating);
+        currentUser.calibrationGames = userCalibrationGames;
+        currentUser.calibrationCompleted = userCalibrationCompleted;
         updateUserUI();
         
         if (ratingChange > 0) {
@@ -2931,10 +2723,6 @@ async function updateRating(gameResult) {
         } else {
             showNotification(`📊 Рейтинг не изменился: ${Math.round(newRating)}`);
         }
-        
-        // Обновляем лидерборд после изменения рейтинга
-        updateLeaderboard();
-        
     } catch (error) {
         console.error('❌ Ошибка обновления рейтинга:', error);
     }
@@ -2980,7 +2768,6 @@ function showAuthScreen() {
     document.getElementById('game').style.display = 'none';
     document.getElementById('admin-panel').style.display = 'none';
     document.getElementById('buffs-panel').style.display = 'none';
-    document.getElementById('leaderboard-panel').style.display = 'none';
     
     document.getElementById('login').value = '';
     document.getElementById('password').value = '';
@@ -3018,8 +2805,8 @@ function updateUserUI() {
     document.getElementById('currentUserName').textContent = currentUser.username;
     
     if (currentUser.calibrationCompleted) {
-        document.getElementById('currentUserRating').textContent = currentUser.rating || 1000;
-        document.getElementById('player1-rating').textContent = `Рейтинг: ${currentUser.rating || 1000}`;
+        document.getElementById('currentUserRating').textContent = currentUser.rating || 0;
+        document.getElementById('player1-rating').textContent = `Рейтинг: ${currentUser.rating || 0}`;
     } else {
         document.getElementById('currentUserRating').textContent = 'калибровка';
         document.getElementById('player1-rating').textContent = 'Рейтинг: калибровка';
@@ -3060,4 +2847,56 @@ async function updateUserStats(result) {
     }
 }
 
-//
+// ====================================================
+// УТИЛИТЫ
+// ====================================================
+function showAuthMessage(message, type = 'error') {
+    const authMessage = document.getElementById('authMessage');
+    if (!authMessage) return;
+    authMessage.textContent = message;
+    authMessage.style.color = type === 'error' ? '#ff6b6b' : 
+                             type === 'success' ? '#00ff88' : '#ffcc00';
+}
+
+function showNotification(message, type = 'info') {
+    const notificationArea = document.getElementById('notification-area');
+    if (!notificationArea) return;
+    
+    const notification = document.createElement('div');
+    notification.className = 'notification';
+    notification.textContent = message;
+    
+    if (type === 'warning') {
+        notification.style.background = 'rgba(255, 204, 0, 0.9)';
+        notification.style.color = '#000';
+    } else if (type === 'error') {
+        notification.style.background = 'rgba(220, 53, 69, 0.9)';
+        notification.style.color = 'white';
+    }
+    
+    notificationArea.appendChild(notification);
+    setTimeout(() => notification.remove(), 3000);
+}
+
+function showFirebaseError(message) {
+    const errorDiv = document.getElementById('firebase-error');
+    if (errorDiv) {
+        errorDiv.style.display = 'block';
+        errorDiv.textContent = message;
+    }
+}
+
+function getFirebaseErrorMessage(error) {
+    switch(error.code) {
+        case 'auth/email-already-in-use': return 'Этот пользователь уже зарегистрирован';
+        case 'auth/invalid-email': return 'Некорректный email';
+        case 'auth/weak-password': return 'Пароль слишком слабый';
+        case 'auth/wrong-password': return 'Неверный пароль';
+        case 'auth/user-not-found': return 'Пользователь не найден';
+        default: return 'Ошибка: ' + error.message;
+    }
+}
+
+window.onload = function() {
+    console.log('🎮 Игра загружена и готова к работе!');
+};
